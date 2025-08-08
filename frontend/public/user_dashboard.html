@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookMyDoc - A doctor appointment booking app</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="./navbar.css">
+
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <img src="./bookmydoc_logo.png" alt="Logo">
+        </div>
+        <div class="nav-links">
+            <button class="symptom-checker-btn" id="symptomChecker">
+                <i class="fas fa-stethoscope"></i>
+                Symptom Checker
+            </button>
+            <a href="#find_doc" class="navtab">Find Doc</a>
+            <a href="#treatment" class="navtab">Treatment</a>
+            <a href="#login" class="navtab">Login</a>
+            <i class="fas fa-user-circle profile-icon" id="profileIcon"></i>
+        </div>
+
+    </nav>
+
+    <div class="sidebar" id="sidebar">
+        <i class="fas fa-times close-btn" id="closeBtn"></i>
+        <div class="up">
+            <ul class="sidebar-tabs">
+                <li><a href="#"><i class="fas fa-file-medical sidebar-icons"></i> E-Prescription</a></li>
+        <li><a href="#"><i class="fas fa-notes-medical sidebar-icons"></i> Medical History</a></li>
+        <li><a href="#"><i class="fas fa-user-friends sidebar-icons"></i> Family</a></li>
+                <li><a href="#"><i class="fas fa-calendar-check sidebar-icons"></i>Appointments</a></li>
+            </ul>
+        </div>
+        <div class="down">
+            <ul class="sidebar-tabs">
+           <li><a href="#"><i class="fas fa-question-circle sidebar-icons"></i> Help Center</a></li>
+            <li><a href="#settings"><i class="fas fa-cog sidebar-icons"></i> Settings</a></li>
+            <li><a href="#logout"><i class="fas fa-sign-out-alt sidebar-icons"></i> Logout</a></li>
+            </ul>
+        </div>
+
+    </div>
+
+    <script src="./navbar.js"></script>
+</body>
+
+</html>
