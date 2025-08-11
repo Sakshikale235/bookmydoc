@@ -2,10 +2,10 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.models import User 
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 
-def index(request):
+def dashboard(request):
     if request.user.is_anonymous:
         return redirect('/auth')
-    return render(request, 'index.html')
+    return render(request, 'dashboard.html')
 
 def auth_page(request):
     # Show login panel by default, or register if ?register=1 in query
