@@ -1,141 +1,131 @@
-* {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-        font-family: 'Poppins', sans-serif;
-    }
+/* Search Section */
+.search-section {
+    margin-top: 70px;
+    padding: 4rem 2rem;
+    text-align: center;
+       position: relative;
+    z-index: 1;
+    /* background-color: aquamarine; */
+}
 
-    body {
-        background: #f6effa;
-        color: #524061;
-    }
+ .search-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
 
-    .title {
-        text-align: left;
-    }
+.search-title {
+    color: var(--primary-color);
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+    opacity: 0;
+    animation: fadeInUp 1s ease forwards;
+}
 
-    /* Navigation Bar */
-    .navbar {
-        background: linear-gradient(135deg, #9355df, #b895e0);
-        padding: 1rem 2rem;
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.116);
-    }
+.search-wrapper {
+    opacity: 0;
+    animation: fadeInUp 1s ease 0.3s forwards;
+}
 
-    .nav-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
+.search-box {
+    /* background: rgba(255, 255, 255, 0.1); */
+    background: var(--symptom-checker-shadow); /* Full opacity */
+   /* background: rgba(42, 126, 193, 0.5); */
 
-    .nav-title {
-        color: #ffffffce;
-        font-size: 2rem;
-        font-weight: 700;
-        font-family: 'Lora', serif;
-    }
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 1.5rem;
+    border: 1px solid rgba(29, 6, 6, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
 
-    .nav-links a {
-        color: #ffffffcc;
-        text-decoration: none;
-        margin: 0 1rem;
-        font-size: 1.1rem;
-        transition: color 0.3s ease;
-    }
+.search-icon {
+    position: absolute;
+    left: 1.5rem;
+    padding-left: 20px;
+    top: 32%;
+    transform: translateY(-50%);
+    /* color: rgba(255, 255, 255); */
+    color:#000000;
+    font-size: 1.2rem;
+}
 
-    .nav-links a:hover {
-        color: #dbb6eb;
-        font-size: 1.13rem;
-    }
+#searchInput {
+    width: 100%;
+    padding: 1rem 1rem 1rem 4rem;
+    border: none;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 15px;
+    color:#180321 ;
+    font-size: 1.1rem;
+    outline: none;
+    transition: all 0.3s ease;
+    position: relative;
+}
 
-    /* Search Section */
-    .search-input {
-        display: block;
-        margin: 20px auto; /* margin-top + horizontal centering */
-        padding: 0.8rem;
-        font-size: 1rem;
-        min-width: 200px;
-        width: 100%;
-        max-width: 400px;
-        /* 👇 Proper search icon */
-        background: url('https://cdn.pixabay.com/photo/2017/01/13/01/22/magnifying-glass-1976105_640.png') no-repeat 10px center;
-        background-size: 18px;
-        padding-left: 2.5rem; /* extra space for icon */
-        font-family: 'Poppins', sans-serif;
-        border: none;
-        border-radius: 999px;
-        background-color: #fff;
-        margin-top: 20px;
-    }
+#searchInput::placeholder {
+    /* color: rgba(225, 49, 49, 0.7); */
+    color: rgba(24, 3, 33, 0.8);;
+}
 
-    .search-input:focus {
-        outline: none;
-        border-color: #a569bd;
-        box-shadow: 0 0 5px rgba(165,105,189,0.3);
-    }
+#searchInput:focus {
+    background: rgba(250, 249, 249, 0.7);
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(73, 185, 223, 0.2);
+}
+
+.search-filters {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 0.5rem 1.5rem;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', Arial, sans-serif;
+    border: 2px solid rgba(24, 3, 33, 0.7);
+    background: transparent;
+    color: rgba(24, 3, 33, 1);
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 700;
+}
+
+.filter-btn:hover,
+.filter-btn.active {
+    background:  rgba(255, 255, 255, 0.4);
+    border-color: rgba(24, 3, 33, 1);
+    transform: translateY(-2px);
+} 
 
 
-    /* Image Slider */
-    .slider-container {
-        max-width: 1200px;
-        margin: 2rem auto;
-        overflow: hidden;
-        position: relative;
-        height: 400px;
-    }
 
-    .slider {
-        display: flex;
-        transition: transform 0.5s ease;
-    }
-
-    .slide {
-        min-width: 100%;
-        height: 400px;
-        position: relative;
-    }
-
-    .slide img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .slide-caption {
-        position: absolute;
-        bottom: 20px;
-        left: 20px;
-        background: rgba(107,63,160,0.7);
-        color: #ffffff;
-        padding: 1rem;
-        border-radius: 5px;
-        font-family: 'Lora', serif;
-    }
-
-    /* Specialist Carousel */
+/* Specialist Carousel */
     .specialist-section {
-        max-width: 1200px;
-        margin: 2rem auto;
-        padding: 1rem 3rem;
+        max-width: 1000px;
+        height: 250px;
+        margin-top: 10px;
+        margin-right: auto;
+        margin-left: auto;
+        padding: 1rem 60px;
         position: relative;
+
     }
 
     .specialist-list {
         display: flex;
-        overflow: hidden;
-        gap: 3rem;
-        padding-bottom: 1rem;
+        flex-wrap: nowrap;
+        gap: 25px;
         align-items: center;
-        justify-content: center;
-        transition: transform 0.4s ease;
+        overflow: hidden; /* hide overflow */
+        transition: transform 0.4s ease; /* smooth slide */
     }
 
     .specialty-card {
-        flex: 0 0 150px;
+        /* flex: 0 0 150px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -146,17 +136,18 @@
         cursor: pointer;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         font-family: 'Poppins', sans-serif;
-        height: 200px; /* or whatever fits your design */
-        justify-content: center;
+        height: 200px;
+        justify-content: center; */
+        flex: 0 0 auto; /* prevent shrink */
+        text-align: center;
     }
 
     .specialty-card img {
-        width: 100px;
-        height: 100px;
-        border-radius: 50%;
+        width: 120px;
+        height: 120px;
         object-fit: cover;
+        border-radius: 50%;
         margin-bottom: 0.5rem;
-        box-shadow: none;
         border: none;
     }
 
@@ -164,10 +155,11 @@
         font-size: 0.9rem;
         color: #3c2f47;
         margin: 0;
+        text-align: center;
     }
 
     .specialty-card:hover {
-        transform: scale(1.1);
+        transform: scale(1.02);
         box-shadow: 0 4px 15px rgba(165,105,189,0.2);
     }
 
@@ -192,172 +184,527 @@
         font-family: 'Poppins', sans-serif;
     }
 
+    .title {
+        font-size: 2rem; /* Adjust heading size */
+        font-weight: bold;
+        margin-left: 100px; /* Push title 100px from the left */
+        margin-bottom: 20px; /* Space between title and carousel */
+        color: #363169; /* Neutral dark text */
+        text-align: left; /* Ensure left alignment */
+        font-family: 'Poppins', sans-serif;
+    }
+/* ---------- Specialties Carousel Arrows ---------- */
+    .specialist-section {
+        position: relative;
+    }
 
-    /* Arrow Navigation */
-    .arrow {
+    .specialist-arrow {
         position: absolute;
         top: 50%;
         transform: translateY(-50%);
-        background: #a569bd;
+        background: #d9b3ff; /* light purple */
         color: #ffffff;
         border: none;
         width: 40px;
         height: 40px;
         cursor: pointer;
-        border-radius: 50%; /* makes it a circle */
+        border-radius: 50%;
         font-size: 1.2rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 1;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* optional for depth */
+        z-index: 2;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         transition: background 0.3s ease;
     }
 
-    .arrow-left {
-        left: 10px;
+    .specialist-arrow:hover {
+        background: #b96bd8; /* darker purple on hover */
     }
 
-    .arrow-right {
-        right: 10px;
+    .specialist-arrow-left {
+        left: -30px;
     }
 
-    /* Honeycomb Doctor Carousel */
-    .honeycomb-carousel {
-        max-width: 1200px;
-        margin: 2rem auto;
-        height: 800px;
+    .specialist-arrow-right {
+        right: -30px;
+    }
+
+
+  /* Honeycomb Doctor Carousel - Circular Layout */
+.honeycomb-carousel {
+    /* max-width: 1000px; */
+    margin: 2rem auto;
+    height: 800px;
+    background: url("{% static 'doctor_bk.png' %}");
+    background-repeat: no-repeat;
+    background-size: cover;
+    position: relative;
+    overflow: hidden;
+    align-items: center;
+    justify-content: center;
+}
+
+/* .honeycomb-carousel .title {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #392649;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    z-index: 10;
+} */
+
+.honeycomb-carousel .title {
+    font-size: 3rem;           /* Bigger font */
+    font-weight: bold;         /* Optional: make it stand out */
+    display: flex;
+    padding-top: 50px;  
+    margin-bottom: -40px;           /* Enables flexbox */
+    justify-content: center;   /* Horizontal centering */
+    align-items: center;       /* Vertical centering */
+    text-align: center;        /* Center text inside element */
+}
+
+
+.honeycomb-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.honeycomb-item {
+    position: absolute;
+    width: 200px;
+    height: 230px;
+    background: #ffffff;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(165,105,189,0.2);
+    overflow: hidden;
+    transition: transform 0.3s ease, width 0.3s ease, height 0.3s ease;
+}
+
+.honeycomb-item:hover {
+    width: 250px;
+    height: 280px;
+    z-index: 5;
+}
+
+.honeycomb-item img {
+    width: 120px;           /* smaller so it fits nicely inside hexagon */
+    height: 120px;
+    border-radius: 50%;     /* makes it circular */
+    object-fit: cover;
+    margin-top: 20px;       /* centers vertically inside hexagon */
+}
+
+/* Position items in a circle */
+.honeycomb-container .honeycomb-item:nth-child(1) { transform: rotate(0deg) translate(230px) rotate(0deg); }
+.honeycomb-container .honeycomb-item:nth-child(2) { transform: rotate(60deg) translate(230px) rotate(-60deg); }
+.honeycomb-container .honeycomb-item:nth-child(3) { transform: rotate(120deg) translate(230px) rotate(-120deg); }
+.honeycomb-container .honeycomb-item:nth-child(4) { transform: rotate(180deg) translate(230px) rotate(-180deg); }
+.honeycomb-container .honeycomb-item:nth-child(5) { transform: rotate(240deg) translate(230px) rotate(-240deg); }
+.honeycomb-container .honeycomb-item:nth-child(6) { transform: rotate(300deg) translate(230px) rotate(-300deg); }
+
+
+
+/* Testimonials */
+.testimonial-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 0; /* reduced from 50px to 20px */
+  position: relative;
+  min-height: auto;
+  justify-content: flex-start;
+}
+
+.carousel-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 1000px;
+  height: 200px;
+  margin-bottom: 200px; /* space below carousel */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  perspective: 1200px;
+}
+
+.carousel {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 1s;
+}
+
+.carousel__item {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 180px;
+  height: 200px;
+  padding: 15px;
+  background: #fff;
+  border-radius: 15px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.carousel__item img {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 10px;
+}
+
+.carousel__name {
+  font-weight: bold;
+  font-size: 1rem;
+  margin-bottom: 5px;
+}
+
+.carousel__review {
+  font-size: 0.85rem;
+  color: #555;
+}
+
+/* Arrows */
+.testimonial-section {
         position: relative;
-        overflow: hidden;
     }
 
-    .honeycomb-container {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        transform-style: preserve-3d;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+.testimonial-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #d9b3ff; 
+    color: #ffffff;
+    border: none;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    transition: background 0.3s ease;
+}
+
+  .testimonial-arrow:hover {
+        background: #b96bd8; /* darker purple on hover */
     }
 
-    .honeycomb-item {
-        position: absolute;
-        width: 200px;
-        height: 230px;
-        background: #ffffff;
-        clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-        text-align: center;
-        transition: transform 0.5s ease, width 0.3s ease, height 0.3s ease;
-        box-shadow: 0 4px 15px rgba(165,105,189,0.2);
-        overflow: hidden;
+    .testimonial-arrow-left {
+        left: 200px;
     }
 
-    .honeycomb-item:hover {
-        width: 280px;
-        height: 310px;
+    .testimonial-arrow-right {
+        right: 200px;
     }
 
-    .honeycomb-item img {
-        width: 100%;
-        height: 60%;
-        object-fit: cover;
+
+
+
+
+/* Carousel Section previous*/
+/* .carousel-section {
+    padding: 4rem 2rem;
+    text-align: center;
+     background: url('./doctor_bk.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+} */
+
+/* .carousel-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+} */
+
+/* .carousel-title {
+    color: var(--primary-color);
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 3rem;
+    opacity: 0;
+    animation: fadeInUp 1s ease 0.6s forwards;
+} */
+
+/* .honeycomb-carousel {
+    position: relative;
+    height: 500px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    animation: fadeInUp 1s ease 0.9s forwards;
+} */
+
+/* .doctor-card {
+    position: absolute;
+    width: 280px;
+    height: 320px;
+    background: rgba(24, 3, 33, 0.3);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    /* border: 1px solid rgba(255, 255, 255, 0.2); 
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    transform-style: preserve-3d;
+    clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+} */
+
+/* .doctor-card:hover {
+    transform: translateY(-10px) scale(1.05);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    background: rgba(24, 3, 33, 0.4);
+}
+
+.card-inner {
+    padding: 2rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+} */
+
+/* .doctor-image {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.doctor-card:hover .doctor-image {
+    transform: scale(1.1);
+    border-color: #ff6b6b;
+} */
+
+/* .doctor-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: all 0.3s ease;
+}
+
+.doctor-info h3 {
+    color: white;
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+} */
+
+/* .doctor-info p {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+.rating {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #ffd700;
+    font-weight: 600;
+}
+
+.rating i {
+    font-size: 1.2rem;
+} */
+
+/* Carousel Controls */
+/* .carousel-controls {
+    position: absolute;
+    bottom: -80px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 1rem;
+} */
+
+/* .carousel-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    color: #180321;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.carousel-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+} */
+
+/* .carousel-pagination {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 2rem;
+}
+
+.pagination-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: all 0.3s ease;
+} */
+
+/* .pagination-dot.active {
+    background: var(--primary-color);
+    transform: scale(1.2);
+} */
+
+
+
+/* Footer */
+.footer {
+    background:rgba(24, 3, 33, 1);
+    backdrop-filter: blur(20px);
+    padding: 2rem;
+    text-align: center;
+    margin-top: 4rem;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.footer-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 1rem;
+}
+
+.footer-logo i {
+    color: #ff6b6b;
+    font-size: 2rem;
+}
+
+.footer p {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.doctor-carousel {
+    display: none;
+}
+
+/* ✅ Doctor Card View (Responsive) */
+.doctor-carousel {
+    display: none;
+}
+
+.doctor-container {
+    display: block;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 20px;
+    padding: 50px;
+    justify-content: center;
+}
+
+.doctor-card {
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    padding: 30px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(165, 105, 189, 0.5);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    flex: 1 1 calc(25% - 20px);
+    /* max-width: 250px; */
+}
+
+.doctor-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 20px rgba(165, 105, 189, 0.3);
+}
+
+.doctor-card img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+}
+
+.doctor-card h3 {
+    margin: 0.8rem 0 0.3rem;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.doctor-card p {
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 0.8rem;
+}
+
+
+/* Animations for ssearchbar and doctor card */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
     }
-
-    /* Testimonials */
-    .testimonials {
-        max-width: 500px;
-        margin: 2rem auto;
-        position: relative;
-        overflow: hidden;
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
+}
 
-    .testimonial-slider {
-        display: flex;
-        transition: transform 0.5s ease;
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
     }
-
-    .testimonial {
-        flex: 0 0 100%;
-        width: 100px;
-        height: 500px;
-        padding: 2rem;
-        background: #ffffff;
-        margin: 0 auto;
-        border-radius: 8px;
-        text-align: center;
-        box-shadow: 0 4px 15px rgba(165,105,189,0.2);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
+    to {
+        transform: rotate(360deg);
     }
+}
 
-    .testimonial img {
-        width: 100px;
-        height: 100px;
-        border-radius: 50%;
-        margin: 0 auto;
 
-    }
-
-    .testimonial h3 {
-        font-family: 'Lora', serif;
-    }
-
-    /* Footer */
-    .footer {
-        background: linear-gradient(135deg, #9355df, #b895e0);
-        color: #ffffff;
-        padding: 2rem;
-        text-align: center;
-    }
-
-    .footer-links a {
-        color: #ffffff;
-        text-decoration: none;
-        margin: 0 1rem;
-        transition: color 0.3s ease;
-        font-family: 'Poppins', sans-serif;
-    }
-
-    .footer-links a:hover {
-        color: #e8d5f0;
-    }
-
-    .social-icons a {
-        color: #ffffff;
-        margin: 0 0.5rem;
-        font-size: 1.5rem;
-        transition: color 0.3s ease;
-    }
-
-    .social-icons a:hover {
-        color: #e8d5f0;
-    }
-
-    /* Responsive Design */
-    @media (max-width: 768px) {
-        .nav-container {
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .search-section {
-            flex-direction: column;
-        }
-
-        .slider-container {
-            height: 200px;
-        }
-
-        .slide {
-            height: 200px;
-        }
-
-        .honeycomb-item {
+/* Responsiveness */
+ @media (max-width: 600px) {
+ .honeycomb-item {
             width: 150px;
             height: 200px;
         }
+
+        .doctor-carousel {
+        display: block;
+    }
 
         .honeycomb-item:hover {
             width: 165px;
@@ -372,8 +719,7 @@
             width: 80px;
             height: 80px;
         }
-
-        .testimonial {
+         .testimonial {
             width: 90%;
             height: 350px;
             padding: 1rem;
@@ -383,4 +729,10 @@
             width: 80px;
             height: 80px;
         }
+
+        .honeycomb-carousel{
+            display: none;
+        }
+
     }
+

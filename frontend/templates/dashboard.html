@@ -1,96 +1,220 @@
-{% extends "base.html" %}
-
-{% comment %} {% comment %} <!-- filepath: c:\Users\Com\OneDrive\Desktop\Django\userapp\templates\index.html -->
-{% extends "base.html" %}
-{% block title %}Home | BookMyDoc{% endblock %}
-{% block content %}
-    <h1>Welcome, {{ request.user.username }}!</h1>
-{% endblock %}{% endcomment %}
-
 {% load static %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block title %}Home | BookMyDoc{% endblock %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookMyDoc - A doctor appointment booking app</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'navbar.css' %}">
+    <link rel="stylesheet" href="{% static 'dashboard.css' %}">
 
-{% block content %}
-    {% comment %} <!-- Welcome Message -->
-    <div class="welcome-message">
-        <h4>Welcome, {{ request.user.username }}!</h4>
-    </div> {% endcomment %}
+</head>
 
-    <!-- Search Section -->
-    <section class="search-section">
-        <input type="text" class="search-input" placeholder="Search">
-    </section>
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <img src="{% static 'bookmydoc_logo.png' %}" alt="Logo">
+        </div>
+        <div class="nav-links">
+            <button class="symptom-checker-btn" id="symptomChecker">
+                <i class="fas fa-stethoscope"></i>
+                Symptom Checker
+            </button>
+            <a href="#find_doc" class="navtab">Find Doc</a>
+            <a href="#treatment" class="navtab">Treatment</a>
+            <a href="#login" class="navtab">Login</a>
+            <i class="fas fa-user-circle profile-icon" id="profileIcon"></i>
+        </div>
 
-    <!-- Image Slider -->
-    <div class="slider-container">
-        <div class="slider">
-            <div class="slide">
-                <img src="https://plus.unsplash.com/premium_photo-1681966826227-d008a1cfe9c7?w=500" alt="Booking">
-                <div class="slide-caption">Easy Appointment Booking</div>
-            </div>
-            <div class="slide">
-                <img src="https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=500" alt="Doctor Availability">
-                <div class="slide-caption">Check Doctor Availability</div>
-            </div>
-            <div class="slide">
-                <img src="https://images.unsplash.com/photo-1666214280465-a40313304801?w=500" alt="Location Suggestions">
-                <div class="slide-caption">Location-based Suggestions</div>
-            </div>
+    </nav>
+
+    <!-- sidebar -->
+    <div class="sidebar" id="sidebar">
+        <i class="fas fa-times close-btn" id="closeBtn"></i>
+        <div class="up">
+            <ul class="sidebar-tabs">
+                <li><a href="#"><i class="fas fa-file-medical sidebar-icons"></i> E-Prescription</a></li>
+                <li><a href="#"><i class="fas fa-notes-medical sidebar-icons"></i> Medical History</a></li>
+                <li><a href="#"><i class="fas fa-user-friends sidebar-icons"></i> Family</a></li>
+                <li><a href="#"><i class="fas fa-calendar-check sidebar-icons"></i>Appointments</a></li>
+            </ul>
+        </div>
+        <div class="down">
+            <ul class="sidebar-tabs">
+                <li><a href="#"><i class="fas fa-question-circle sidebar-icons"></i> Help Center</a></li>
+                <li><a href="#settings"><i class="fas fa-cog sidebar-icons"></i> Settings</a></li>
+                <li><a href="#logout"><i class="fas fa-sign-out-alt sidebar-icons"></i> Logout</a></li>
+            </ul>
+        </div>
+
+    </div>
+
+    <!-- mobile navbar -->
+    <div class="mobile-view">
+        <div class="mobile-navbar">
+            <ul>
+                <li class="mobile-list">
+                    <a href="#">
+                        <span class="mobile-icon active">
+                            <i class="fas fa-user-circle m-profile-icon" id="m-profile-icon"></i>
+                        </span>
+                        <span class="mobile-text">Profile</span>
+                    </a>
+                </li>
+
+
+                <li class="mobile-list">
+                    <a href="#">
+                        <span class="mobile-icon">
+                            <i class="fas fa-pills"></i>
+                        </span>
+                        <span class="mobile-text">Treatment</span>
+                    </a>
+                </li>
+                <li class="mobile-list">
+                    <a href="#">
+                        <span class="mobile-icon">
+                            <i class="fas fa-stethoscope m-symptom-icon"></i>
+                        </span>
+                        <span class="mobile-text">Symptom Checker</span>
+                    </a>
+                </li>
+                <li class="mobile-list">
+                    <a href="#">
+                        <span class="mobile-icon">
+                            <i class="fas fa-power-off"></i>
+                        </span>
+                        <span class="mobile-text">Login</span>
+                    </a>
+                </li>
+                <li class="mobile-list">
+                    <a href="#">
+                        <span class="mobile-icon">
+                            <i class="fas fa-user-md"></i>
+                        </span>
+                        <span class="mobile-text">Find Doc</span>
+                    </a>
+                </li>
+
+                <div class="indicator"></div>
+            </ul>
+
         </div>
     </div>
 
+
+    <!-- Search Section -->
+    <section class="search-section" id="search">
+        <div class="search-container">
+            <h2 class="search-title">Find Your Perfect Doctor</h2>
+            <div class="search-wrapper">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search by name, location, or specialization...">
+                    <div class="search-filters">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="name">Name</button>
+                        <button class="filter-btn" data-filter="location">Location</button>
+                        <button class="filter-btn" data-filter="disease">Disease</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Specialist Carousel -->
+    <h2 class="title">Our Specialties</h2>
+
     <section class="specialist-section">
-        <h2 class="title">Our Specialties</h2>
         <div class="specialist-list">
             <div class="specialty-card" data-specialty="Cardiologist">
-                <img src="https://images.unsplash.com/photo-1618939304347-e91b1f33d2ab?w=500" alt="Cardiologist">
+                <img src="https://images.unsplash.com/photo-1618939304347-e91b1f33d2ab?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OHx8Y2FyZGlvbG9naXN0fGVufDB8fDB8fHww"
+                    alt="Cardiologist">
                 <p>Cardiologist</p>
             </div>
             <div class="specialty-card" data-specialty="Dermatologist">
-                <img src="https://images.unsplash.com/photo-1609542334025-778f9093a234?w=500" alt="Dermatologist">
+                <img src="https://images.unsplash.com/photo-1609542334025-778f9093a234?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8c2tpbnxlbnwwfHwwfHx8MA%3D%3D"
+                    alt="Dermatologist">
                 <p>Dermatologist</p>
             </div>
             <div class="specialty-card" data-specialty="ENT">
-                <img src="https://plus.unsplash.com/premium_photo-1671717725132-5eacbfd6abd2?w=500" alt="ENT">
+                <img src="https://plus.unsplash.com/premium_photo-1671717725132-5eacbfd6abd2?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8ZWFyfGVufDB8fDB8fHww"
+                    alt="ENT">
                 <p>ENT</p>
             </div>
             <div class="specialty-card" data-specialty="Neurologist">
-                <img src="https://media.istockphoto.com/id/2225597060/photo/neurological-diseases.webp" alt="Neurologist">
+                <img src="https://media.istockphoto.com/id/2225597060/photo/neurological-diseases-brain-nerve-cells-and-nervous-system-anatomy-3d-illustration.webp?a=1&b=1&s=612x612&w=0&k=20&c=nm_dTZOt2_zYYuG7kNmayzDZn4Z4qUVnuP_ndzMqm3I="
+                    alt="Neurologist">
+                <p>Neurologist</p>
+            </div>
+            <div class="specialty-card" data-specialty="Neurologist">
+                <img src="https://media.istockphoto.com/id/2225597060/photo/neurological-diseases-brain-nerve-cells-and-nervous-system-anatomy-3d-illustration.webp?a=1&b=1&s=612x612&w=0&k=20&c=nm_dTZOt2_zYYuG7kNmayzDZn4Z4qUVnuP_ndzMqm3I="
+                    alt="Neurologist">
+                <p>Neurologist</p>
+            </div>
+            <div class="specialty-card" data-specialty="Neurologist">
+                <img src="https://media.istockphoto.com/id/2225597060/photo/neurological-diseases-brain-nerve-cells-and-nervous-system-anatomy-3d-illustration.webp?a=1&b=1&s=612x612&w=0&k=20&c=nm_dTZOt2_zYYuG7kNmayzDZn4Z4qUVnuP_ndzMqm3I="
+                    alt="Neurologist">
+                <p>Neurologist</p>
+            </div>
+            <div class="specialty-card" data-specialty="Neurologist">
+                <img src="https://media.istockphoto.com/id/2225597060/photo/neurological-diseases-brain-nerve-cells-and-nervous-system-anatomy-3d-illustration.webp?a=1&b=1&s=612x612&w=0&k=20&c=nm_dTZOt2_zYYuG7kNmayzDZn4Z4qUVnuP_ndzMqm3I="
+                    alt="Neurologist">
+                <p>Neurologist</p>
+            </div>
+            <div class="specialty-card" data-specialty="Neurologist">
+                <img src="https://media.istockphoto.com/id/2225597060/photo/neurological-diseases-brain-nerve-cells-and-nervous-system-anatomy-3d-illustration.webp?a=1&b=1&s=612x612&w=0&k=20&c=nm_dTZOt2_zYYuG7kNmayzDZn4Z4qUVnuP_ndzMqm3I="
+                    alt="Neurologist">
+                <p>Neurologist</p>
+            </div>
+            <div class="specialty-card" data-specialty="Neurologist">
+                <img src="https://media.istockphoto.com/id/2225597060/photo/neurological-diseases-brain-nerve-cells-and-nervous-system-anatomy-3d-illustration.webp?a=1&b=1&s=612x612&w=0&k=20&c=nm_dTZOt2_zYYuG7kNmayzDZn4Z4qUVnuP_ndzMqm3I="
+                    alt="Neurologist">
+                <p>Neurologist</p>
+            </div>
+            <div class="specialty-card" data-specialty="Neurologist">
+                <img src="https://media.istockphoto.com/id/2225597060/photo/neurological-diseases-brain-nerve-cells-and-nervous-system-anatomy-3d-illustration.webp?a=1&b=1&s=612x612&w=0&k=20&c=nm_dTZOt2_zYYuG7kNmayzDZn4Z4qUVnuP_ndzMqm3I="
+                    alt="Neurologist">
                 <p>Neurologist</p>
             </div>
         </div>
-        <button class="arrow arrow-left" onclick="moveSpecialist('left')">&#9664;</button>
-        <button class="arrow arrow-right" onclick="moveSpecialist('right')">&#9654;</button>
+        <div class="doctor-list" id="doctorList"></div>
+        <button class="specialist-arrow specialist-arrow-left" onclick="moveSpecialist('left')">&#9664;</button>
+        <button class="specialist-arrow specialist-arrow-right" onclick="moveSpecialist('right')">&#9654;</button>
     </section>
 
-    <!-- Honeycomb Doctor Carousel -->
+    <!-- Carousel stuti -->
+       <!-- Honeycomb Doctor Carousel -->
+   
+
     <section class="honeycomb-carousel">
-        <h2 class="title">Meet Our Doctors</h2>
+
+         <h2 class="title">Meet Our Doctors</h2>
         <div class="honeycomb-container">
             <div class="honeycomb-item" data-index="0">
-                <img src="https://plus.unsplash.com/premium_photo-1658506671316-0b293df7c72b?w=500" alt="Doctor 1">
+                <img src="https://plus.unsplash.com/premium_photo-1658506671316-0b293df7c72b?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8ZG9jdG9yfGVufDB8fDB8fHww" alt="Doctor 1">
                 <h3>Dr. John Smith</h3>
                 <p>Cardiologist</p>
             </div>
             <div class="honeycomb-item" data-index="1">
-                <img src="https://media.istockphoto.com/id/1270790502/photo/medical-concept-of-indian-beautiful-female-doctor.webp" alt="Doctor 2">
+                <img src="https://media.istockphoto.com/id/1270790502/photo/medical-concept-of-indian-beautiful-female-doctor-with-note-book.webp?a=1&b=1&s=612x612&w=0&k=20&c=fg_7luuQzYkY9AOwJDtX817uZTIDoFdKgTVG-kIf7BA=" alt="Doctor 2">
                 <h3>Dr. Sarah Johnson</h3>
                 <p>Dermatologist</p>
             </div>
             <div class="honeycomb-item" data-index="2">
-                <img src="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500" alt="Doctor 3">
+                <img src="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Nnx8ZG9jdG9yfGVufDB8fDB8fHww" alt="Doctor 3">
                 <h3>Dr. Michael Brown</h3>
                 <p>ENT</p>
             </div>
             <div class="honeycomb-item" data-index="3">
-                <img src="https://images.unsplash.com/photo-1673865641073-4479f93a7776?w=500" alt="Doctor 4">
+                <img src="https://images.unsplash.com/photo-1673865641073-4479f93a7776?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mzd8fGRvY3RvcnxlbnwwfHwwfHx8MA%3D%3D" alt="Doctor 4">
                 <h3>Dr. Emily Davis</h3>
                 <p>Neurologist</p>
             </div>
             <div class="honeycomb-item" data-index="4">
-                <img src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=500" alt="Doctor 5">
+                <img src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTJ8fGRvY3RvcnxlbnwwfHwwfHx8MA%3D%3D" alt="Doctor 5">
                 <h3>Dr. Lisa Wilson</h3>
                 <p>Pediatrician</p>
             </div>
@@ -100,31 +224,228 @@
                 <p>Orthopedist</p>
             </div>
         </div>
-        <button class="arrow arrow-left" onclick="moveHoneycomb('left')">&#9664;</button>
-        <button class="arrow arrow-right" onclick="moveHoneycomb('right')">&#9654;</button>
+        <button class="honeycomb-arrow honeycomb-arrow-left" onclick="moveHoneycomb('left')">&#9664;</button>
+        <button class="honeycomb-arrow honeycomb-arrow-right" onclick="moveHoneycomb('right')">&#9654;</button>
     </section>
 
-    <!-- Testimonials -->
-    <section class="testimonials">
-        <h2 class="title">What Our Patients Say</h2>
-        <div class="testimonial-slider">
-            <div class="testimonial">
-                <img src="https://cdn.pixabay.com/photo/2017/01/29/21/16/nurse-2019420_640.jpg" alt="User 1">
-                <h3>Jane Doe</h3>
-                <p>Booking was so easy and quick! The interface is intuitive and user-friendly.</p>
+    <!-- mobile view  -->
+      <div class="doctor-carousel">
+    <div class="doctor-container">
+    <h2 class="title">Meet Our Doctors</h2>
+        <!-- Doctor Card 1 -->
+        <div class="doctor-card">
+            <img src="https://images.unsplash.com/photo-1673865641073-4479f93a7776?w=500" alt="Dr. Lisa Wilson">
+            <h3>Dr. Lisa Wilson</h3>
+            <p>Pediatrician</p>
+        </div>
+
+        <!-- Doctor Card 2 -->
+        <div class="doctor-card">
+            <img src="https://plus.unsplash.com/premium_photo-1658506671316-0b293df7c72b?w=500" alt="Dr. David Lee">
+            <h3>Dr. David Lee</h3>
+            <p>Orthopedist</p>
+        </div>
+
+        <!-- Doctor Card 3 -->
+        <div class="doctor-card">
+            <img src="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=500" alt="Dr. Michael Brown">
+            <h3>Dr. Michael Brown</h3>
+            <p>Cardiologist</p>
+        </div>
+
+        <!-- Doctor Card 4 -->
+        <div class="doctor-card">
+            <img src="https://images.pexels.com/photos/19596247/pexels-photo-19596247.jpeg?w=500" alt="Dr. Sarah Johnson">
+            <h3>Dr. Sarah Johnson</h3>
+            <p>Dermatologist</p>
+        </div>
+    </div>
+</div>
+
+    <!-- Testimonials Section -->
+     <h2 class="title">What Our Patients Say</h2>
+     <section class="testimonial-section">
+<div class="carousel-wrapper">
+
+  <div class="carousel" id="carousel">
+    <div class="carousel__item">
+      <img src="https://via.placeholder.com/80" alt="Alex">
+      <div class="carousel__name">Alex</div>
+      <div class="carousel__review">This service is amazing!</div>
+    </div>
+    <div class="carousel__item">
+      <img src="https://via.placeholder.com/80" alt="Maria">
+      <div class="carousel__name">Maria</div>
+      <div class="carousel__review">I love how easy it was to use.</div>
+    </div>
+    <div class="carousel__item">
+      <img src="https://via.placeholder.com/80" alt="John">
+      <div class="carousel__name">John</div>
+      <div class="carousel__review">Fantastic customer support.</div>
+    </div>
+    <div class="carousel__item">
+      <img src="https://via.placeholder.com/80" alt="Sarah">
+      <div class="carousel__name">Sarah</div>
+      <div class="carousel__review">Exceeded my expectations!</div>
+    </div>
+    <div class="carousel__item">
+      <img src="https://via.placeholder.com/80" alt="Liam">
+      <div class="carousel__name">Liam</div>
+      <div class="carousel__review">Highly recommend to everyone.</div>
+    </div>
+    <div class="carousel__item">
+      <img src="https://via.placeholder.com/80" alt="Emma">
+      <div class="carousel__name">Emma</div>
+      <div class="carousel__review">Will use it again for sure.</div>
+    </div>
+  </div>
+</div>
+<button class="testimonial-arrow testimonial-arrow-left" onclick="moveTestimonial('left')">&#9664;</button>
+<button class="testimonial-arrow testimonial-arrow-right" onclick="moveTestimonial('right')">&#9654;</button>
+</section>
+
+
+    <!-- Carousel Section previous -->
+    <!-- <section class="carousel-section">
+        <div class="carousel-container">
+            <h2 class="carousel-title">Our Expert Doctors</h2>
+            <div class="honeycomb-carousel" id="carousel">
+                <div class="doctor-card" data-index="0">
+                    <div class="card-inner">
+                        <div class="doctor-image">
+                            <img src="https://images.pexels.com/photos/5215024/pexels-photo-5215024.jpeg?auto=compress&cs=tinysrgb&w=300"
+                                alt="Dr. Sarah Johnson">
+                        </div>
+                        <div class="doctor-info">
+                            <h3>Dr. Sarah Johnson</h3>
+                            <p>Cardiologist</p>
+                            <div class="rating">
+                                <i class="fas fa-star"></i>
+                                <span>4.9</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doctor-card" data-index="1">
+                    <div class="card-inner">
+                        <div class="doctor-image">
+                            <img src="https://images.pexels.com/photos/6749778/pexels-photo-6749778.jpeg?auto=compress&cs=tinysrgb&w=300"
+                                alt="Dr. Michael Chen">
+                        </div>
+                        <div class="doctor-info">
+                            <h3>Dr. Michael Chen</h3>
+                            <p>Dermatologist</p>
+                            <div class="rating">
+                                <i class="fas fa-star"></i>
+                                <span>4.8</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doctor-card" data-index="2">
+                    <div class="card-inner">
+                        <div class="doctor-image">
+                            <img src="https://images.pexels.com/photos/5327921/pexels-photo-5327921.jpeg?auto=compress&cs=tinysrgb&w=300"
+                                alt="Dr. Emily Rodriguez">
+                        </div>
+                        <div class="doctor-info">
+                            <h3>Dr. Emily Rodriguez</h3>
+                            <p>Pediatrician</p>
+                            <div class="rating">
+                                <i class="fas fa-star"></i>
+                                <span>4.7</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doctor-card" data-index="3">
+                    <div class="card-inner">
+                        <div class="doctor-image">
+                            <img src="https://images.pexels.com/photos/4173251/pexels-photo-4173251.jpeg?auto=compress&cs=tinysrgb&w=300"
+                                alt="Dr. James Wilson">
+                        </div>
+                        <div class="doctor-info">
+                            <h3>Dr. James Wilson</h3>
+                            <p>Neurologist</p>
+                            <div class="rating">
+                                <i class="fas fa-star"></i>
+                                <span>4.9</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doctor-card" data-index="4">
+                    <div class="card-inner">
+                        <div class="doctor-image">
+                            <img src="https://images.pexels.com/photos/4021775/pexels-photo-4021775.jpeg?auto=compress&cs=tinysrgb&w=300"
+                                alt="Dr. Lisa Thompson">
+                        </div>
+                        <div class="doctor-info">
+                            <h3>Dr. Lisa Thompson</h3>
+                            <p>Gynecologist</p>
+                            <div class="rating">
+                                <i class="fas fa-star"></i>
+                                <span>4.8</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="doctor-card" data-index="5">
+                    <div class="card-inner">
+                        <div class="doctor-image">
+                            <img src="https://images.pexels.com/photos/4021783/pexels-photo-4021783.jpeg?auto=compress&cs=tinysrgb&w=300"
+                                alt="Dr. Robert Davis">
+                        </div>
+                        <div class="doctor-info">
+                            <h3>Dr. Robert Davis</h3>
+                            <p>Orthopedist</p>
+                            <div class="rating">
+                                <i class="fas fa-star"></i>
+                                <span>4.6</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="testimonial">
-                <img src="https://cdn.pixabay.com/photo/2017/03/14/03/20/woman-2141808_640.jpg" alt="User 2">
-                <h3>John Smith</h3>
-                <p>Found the perfect specialist for my needs in just a few clicks!</p>
-            </div>
-            <div class="testimonial">
-                <img src="https://via.placeholder.com/100?text=User+3" alt="User 3">
-                <h3>Mary Johnson</h3>
-                <p>Highly recommend BookMyDoc for hassle-free appointments!</p>
+
+            <div class="carousel-controls">
+                <button id="prevBtn" class="carousel-btn">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="carousel-pagination"></div>
+                <button id="nextBtn" class="carousel-btn">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
             </div>
         </div>
-        <button class="arrow arrow-left" onclick="moveTestimonial('left')">&#9664;</button>
-        <button class="arrow arrow-right" onclick="moveTestimonial('right')">&#9654;</button>
-    </section>
-{% endblock %}
+    </section> -->
+
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-logo">
+                <i class="fas fa-heartbeat"></i>
+                <span>
+                    BookMyDoc
+                </span>
+            </div>
+            <p>&copy; 2025 BookMyDoc. Your health, our priority.</p>
+        </div>
+    </footer>
+
+
+
+    <script src="{% static 'navbar.js' %}"></script>
+    <script src="{% static 'dashboard.js' %}"></script>
+
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</body>
+
+</html>
