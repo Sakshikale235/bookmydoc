@@ -50,3 +50,13 @@ def login(request):
 def logoutuser(request):
     auth_logout(request)
     return redirect('/auth')
+
+
+def symptom_checker(request):
+    return render(request, "symptom_checker.html")
+
+def find_doc(request):
+    return render(request, "find_doc.html")
+
+def treatment(request):
+    return render(request, "treatment.html")
