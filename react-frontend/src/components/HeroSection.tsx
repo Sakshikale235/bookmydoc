@@ -3,8 +3,10 @@ import { Input } from "@/components/ui/input";
 import { Search, MapPin, Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
 import heroImage from "@/assets/hero-medical.jpg";
+import AnimatedHeading from "@/components/ui/AnimatedHeading";
 import medicalEquipment from "@/assets/medical-equipment.jpg";
 import specialistsGroup from "@/assets/specialists-group.jpg";
+import TypingText from "@/components/ui/TypingText";
 
 const HeroSection = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -14,17 +16,17 @@ const HeroSection = () => {
   const slides = [
     {
       image: heroImage,
-      title: "Your Health, Our Priority",
+      title: " Your Health, Our Priority",
       subtitle: "Connect with top-rated doctors and specialists in your area"
     },
     {
       image: medicalEquipment,
-      title: "Advanced Medical Care",
+      title: " Advanced Medical Care",
       subtitle: "State-of-the-art equipment and expert medical professionals"
     },
     {
       image: specialistsGroup,
-      title: "Expert Specialists",
+      title: " Expert Specialists",
       subtitle: "Access to a wide range of medical specialists and healthcare providers"
     }
   ];
@@ -62,9 +64,16 @@ const HeroSection = () => {
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Text Content */}
           <div className="text-center lg:text-left order-2 lg:order-1">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4 lg:mb-6 leading-tight">
+            {/* <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4 lg:mb-6 leading-tight">
               {slides[currentSlide].title}
-            </h1>
+            </h1> */}
+            <TypingText
+  text={slides[currentSlide].title}
+  speed={120}
+  className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4 lg:mb-6 leading-tight"
+/>
+
+
             <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-6 lg:mb-8 max-w-2xl mx-auto lg:mx-0">
               {slides[currentSlide].subtitle}
             </p>
@@ -82,7 +91,7 @@ const HeroSection = () => {
                 variant="outline" 
                 size="lg"
             
-                className="border-[#2D9CDB] text-[#2D9CDB] hover:bg-[#56CCF2] hover:text-primary-foreground text-base lg:text-lg px-6 lg:px-8 py-4 lg:py-6 hover:shadow-glow-blue hover:translate-x-[7px] active:translate-x-0"
+                className="border-[#1c5a6a] text-[#1c5a6a] hover:bg-[#56CCF2] hover:text-primary-foreground text-base lg:text-lg px-6 lg:px-8 py-4 lg:py-6 transition-all hover:scale-[1.05] hover:border-[#56CCF2] hover:shadow-glow-blue hover:translate-x-[7px] active:translate-x-0"
               >
                 Emergency Care
               </Button>
@@ -90,10 +99,12 @@ const HeroSection = () => {
           </div>
 
           {/* Search Box */}
-          <div className="bg-card/95 backdrop-blur-md rounded-2xl shadow-medical p-4 sm:p-6 lg:p-8 border border-border order-1 lg:order-2 mt-4 sm:mt-6 lg:mt-8">
-            <h3 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 lg:mb-6 text-center">
+          <div className="bg-card/95 backdrop-blur-md rounded-2xl shadow-medical p-4 sm:p-6 lg:p-8 border border-border order-1 lg:order-2 mt-4 sm:mt-6 lg:mt-8 hover:scale-105 hover:-translate-y-2 transition-all duration-300">
+            {/* <h3 className="text-xl sm:text-2xl font-semibold text-foreground mb-4 lg:mb-6 text-center">
               Find Your Doctor
-            </h3>
+            </h3> */}
+            <AnimatedHeading />
+
             
             <div className="space-y-4">
               <div className="relative">
