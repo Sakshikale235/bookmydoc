@@ -155,18 +155,11 @@
 
 
 
-
-
 import { DoctorCard } from "@/components/ui/DoctorCard";
-import { motion, Variants } from "framer-motion";
-import { useEffect, useState } from "react";
-
-const variants: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-  slideStart: { clipPath: "inset(0 80% 0 0 round 16px)", opacity: 0 },
-  slideEnd: { clipPath: "inset(0 0% 0 0 round 16px)", opacity: 1 },
-};
+import { Button } from "@/components/ui/button";
+import { Star, Award, Clock, MapPin } from "lucide-react";
+import { useState, useEffect } from "react";
+import { motion, Variants } from 'framer-motion';
 
 interface Doctor {
   id: number;
@@ -175,7 +168,7 @@ interface Doctor {
   rating: number;
   experience: string;
   location: string;
-  distance?: string;
+  distance: string;
   availableSlots: string[];
   image: string;
   consultationFee: number;
@@ -184,16 +177,7 @@ interface Doctor {
 }
 
 const DoctorsCarousel = () => {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkScreen = () => setIsMobile(window.innerWidth < 768);
-    checkScreen();
-    window.addEventListener("resize", checkScreen);
-    return () => window.removeEventListener("resize", checkScreen);
-  }, []);
-
-  const famousDoctors: Doctor[] = [
+  const famousDoctors = [
     {
       id: 1,
       name: "Dr. Sarah Johnson",
@@ -203,7 +187,7 @@ const DoctorsCarousel = () => {
       location: "New York",
       distance: "2.5 km",
       availableSlots: ["09:00 AM", "11:30 AM", "02:00 PM"],
-      image: "/doctors/doctor1.jpg",
+      image: "https://www.rawpixel.com/image/15386675/female-indian-doctor-confident-smiling-person",
       consultationFee: 1500,
       patients: "2000+"
     },
@@ -217,8 +201,9 @@ const DoctorsCarousel = () => {
       availableSlots: ["09:00 AM", "11:30 AM", "02:00 PM"],
       patients: "1800+",
       awards: "Excellence in Neurology",
-      image: "/doctors/doctor1.jpg",
+       image: "https://www.rawpixel.com/image/15386689/male-indian-doctor-confident-smiling-person",
       consultationFee: 1500,
+  
     },
     {
       id: 3,
@@ -232,6 +217,7 @@ const DoctorsCarousel = () => {
       awards: "Top Pediatrician 2023",
       image: "/doctors/doctor1.jpg",
       consultationFee: 500,
+  
     },
     {
       id: 4,
@@ -245,6 +231,7 @@ const DoctorsCarousel = () => {
       awards: "Surgical Excellence Award",
       image: "/doctors/doctor1.jpg",
       consultationFee: 1500,
+  
     },
     {
       id: 5,
@@ -258,6 +245,7 @@ const DoctorsCarousel = () => {
       awards: "Dermatology Innovation Award",
       image: "/doctors/doctor1.jpg",
       consultationFee: 1200,
+  
     },
     {
       id: 6,
@@ -271,10 +259,11 @@ const DoctorsCarousel = () => {
       awards: "Cancer Care Excellence",
       image: "/doctors/doctor1.jpg",
       consultationFee: 2000,
+  
     }
   ];
 
-  const handleBookAppointment = (doctor: Doctor) => {
+  const handleBookAppointment = (doctor: any) => {
     console.log("Booking appointment with", doctor.name);
   };
 
@@ -290,24 +279,28 @@ const DoctorsCarousel = () => {
           </p>
         </div>
 
+        {/* Doctors Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {famousDoctors.map((doctor, index) => (
-            <motion.div
+            <DoctorCard
               key={doctor.id}
-              variants={variants}
-              initial={isMobile ? "visible" : "slideStart"}
-              whileInView={isMobile ? "visible" : "slideEnd"}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-            >
-
-              
-              <DoctorCard
-                doctor={doctor}
-                index={index}
-                onBook={() => handleBookAppointment(doctor)}
-              />
-            </motion.div>
+              doctor={{
+                id: doctor.id,
+                name: doctor.name,
+                specialty: doctor.specialty,
+                rating: doctor.rating,
+                experience: doctor.experience,
+                location: doctor.location,
+                distance: doctor.distance ?? "",
+                availableSlots: doctor.availableSlots ?? [],
+                image: doctor.image ?? "",
+                consultationFee: doctor.consultationFee ?? 0,
+                patients: doctor.patients,
+                awards: doctor.awards,
+              }}
+              index={index}
+              onBook={() => handleBookAppointment(doctor)}
+            />
           ))}
         </div>
       </div>
@@ -316,4 +309,3 @@ const DoctorsCarousel = () => {
 };
 
 export default DoctorsCarousel;
-

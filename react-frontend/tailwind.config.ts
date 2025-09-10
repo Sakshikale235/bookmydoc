@@ -67,19 +67,26 @@ export default {
 				}
 			},
 			fontFamily: {
+				DEFAULT: ['sans-serif'],
 				bauhaus: ['BauhausStd', 'sans-serif'],
+			},
+			borderWidth: {
+				3: '3px',
+				4: '4px',
+				25: '2.3px',
 			},
 			backgroundImage: {
 				'gradient-primary': 'var(--gradient-primary)',
 				'gradient-hero': 'var(--gradient-hero)',
 				'gradient-card': 'var(--gradient-card)',
-				'blue-gradient': 'linear-gradient(135deg, #2D9CDB, #56CCF2)'
+				'blue-gradient': 'linear-gradient(135deg, #178acdff, #61cdf1ff)',
+				 'gradient-primary05': 'linear-gradient(135deg, hsla(217, 91%, 60%, 0.5), hsla(174, 56%, 47%, 0.5))',
 			},
 			boxShadow: {
 				'medical': 'var(--shadow-medical)',
 				'card': 'var(--shadow-card)',
 				'testimonial': 'var(--shadow-testimonial)',
-				'glow-blue': '0 0 20px rgba(45, 156, 219, 0.5)'
+				'glow-blue': '0 0 20px rgba(45, 156, 219, 0.7)'
 			},
 			transitionTimingFunction: {
 				'medical': 'var(--transition-medical)'
