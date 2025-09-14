@@ -68,7 +68,7 @@ function MarqueeRow({ items, direction = "left", speed = 30 }) {
 function Item({ text }) {
   return (
     <div className="flex items-center gap-6 flex-shrink-0">
-      <h1 className="text-2xl sm:text-4xl font-bold text-zinc-800 dark:text-zinc-100 whitespace-nowrap">{text}</h1>
+      <h1 className="text-xl sm:text-4xl font-bold text-zinc-800 dark:text-zinc-100 whitespace-nowrap">{text}</h1>
       <span className="h-2 w-2 flex-shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" aria-hidden />
     </div>
   );
