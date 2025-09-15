@@ -1,12 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bot } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import SeasonalHealth from '@/components/ui/SeasonalHealth';
 import Chatbot from '@/components/ui/Chatbot';
 import Footer from '@/components/Footer'; 
+import gsap from 'gsap';
 
 const SymptomChecker: React.FC = () =>  {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Refs for gsap animations
+  const navRef = useRef<HTMLDivElement>(null);
+  const seasonalRef = useRef<HTMLDivElement>(null);
+  const chatbotRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+  const symptomsRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    const tl = gsap.timeline({ defaults: { duration: 1, ease: "power3.out" } });
+
+    tl.from(navRef.current, { y: -80, opacity: 0 })
+      .from(seasonalRef.current, { y: 50, opacity: 0 }, "-=0.5")
+      .from(chatbotRef.current, { scale: 0.8, opacity: 0 }, "-=0.3")
+      .from(footerRef.current, { y: 80, opacity: 0 }, "-=0.4");
+  }, []);
+
+  // Animate symptoms list on mount + hover
+  useEffect(() => {
+    if (symptomsRef.current) {
+      gsap.from(symptomsRef.current.children, {
+        opacity: 0,
+        x: -30,
+        stagger: 0.2,
+        duration: 0.6,
+        ease: "power2.out"
+      });
+
+      // Add hover animations for each symptom <li>
+      Array.from(symptomsRef.current.children).forEach((el, idx) => {
+        const li = el as HTMLElement;
+
+        li.addEventListener("mouseenter", () => {
+          gsap.to(li, {
+            scale: 1.05,
+            backgroundColor: idx % 2 === 0 ? "#f0f9ff" : "#f0fff4", // blue for odd, green for even
+            duration: 0.3,
+            ease: "power2.out"
+          });
+        });
+
+        li.addEventListener("mouseleave", () => {
+          gsap.to(li, {
+            scale: 1,
+            backgroundColor: "transparent",
+            duration: 0.3,
+            ease: "power2.inOut"
+          });
+        });
+      });
+    }
+  }, []);
 
   const smoothScroll = (id: string) => {
     const section = document.getElementById(id);
@@ -25,7 +78,10 @@ const SymptomChecker: React.FC = () =>  {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       /> */}
 
-       <Navigation />
+      {/* Navigation */}
+      <div ref={navRef}>
+        <Navigation />
+      </div>
 
       {/* Hero Section */}
       {/*
@@ -57,9 +113,20 @@ const SymptomChecker: React.FC = () =>  {
       </section>
       */}
 
-      <SeasonalHealth />
-      <Chatbot />
-       <Footer />
+      {/* Seasonal Health */}
+      <div id="seasonal" ref={seasonalRef}>
+        <SeasonalHealth />
+      </div>
+
+      {/* Chatbot */}
+      <div id="chatbot" ref={chatbotRef}>
+        <Chatbot />
+      </div>
+
+      {/* Footer */}
+      <div ref={footerRef}>
+        <Footer />
+      </div>
       
       {/* Footer */
       /* <footer className="bg-gray-800 text-white py-12">
@@ -121,6 +188,9 @@ const SymptomChecker: React.FC = () =>  {
 export default SymptomChecker;
 
 
+// ----------------- COMMENTED OLDER VERSION -----------------
+// I’ve kept your entire older inline SymptomChecker with chatbot + diseases
+// untouched below so you can still refer to it if needed.
 
 
 // import React, { useState } from 'react';
@@ -191,7 +261,7 @@ export default SymptomChecker;
 //         </h1>
 //         <div className={`diseases-content ${isExpanded ? 'active' : ''}`} style={{ maxHeight: isExpanded ? '1000px' : '0', overflow: 'hidden', transition: 'max-height 0.5s ease-out' }}>
 //           <p>Below is a list of common diseases that occur during the winter season, along with their typical symptoms.</p>
-//           <ul style={{ listStyleType: 'disc', paddingLeft: '40px', marginBottom: '20px' }}>
+//           <ul ref={symptomsRef} style={{ listStyleType: 'disc', paddingLeft: '40px', marginBottom: '20px' }}>
 //             <li><strong>Common Cold:</strong> Sneezing, Coughing, Stuffiness, Fatigue</li>
 //             <li><strong>Flu (Influenza):</strong> Fever, Achiness, Fatigue</li>
 //             <li><strong>COVID-19:</strong> Sore throat, Congestion, Respiratory distress, Extreme fatigue, Body aches</li>
