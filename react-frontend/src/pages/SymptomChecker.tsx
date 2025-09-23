@@ -26,6 +26,9 @@ const SymptomChecker: React.FC = () =>  {
       /> */}
 
        <Navigation />
+        <SeasonalHealth />
+      <Chatbot />
+       <Footer />
 
       {/* Hero Section */}
       {/*
