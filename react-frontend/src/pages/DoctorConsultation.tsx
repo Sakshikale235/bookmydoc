@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Heart, Users, MapPin, Phone } from 'lucide-react';
 import { DoctorCardHorizontal } from '@/components/ui/DoctorCardHorizontal';
 import Navigation from '@/components/Navigation';
@@ -6,10 +6,27 @@ import Footer from '@/components/Footer';
 import { SearchBarHorizontal } from '@/components/ui/SearchBarHorizontal';
 import { doctorsData } from '@/data/doctors';
 import { Doctor } from '@/types/doctor';
+import gsap from 'gsap';
 
 const DoctorConsultation: React.FC = () =>  {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSpecialization, setSelectedSpecialization] = useState('');
+
+  const cardsRef = useRef<HTMLDivElement | null>(null);
+
+  // Animate doctor cards when they load or filter changes
+  useEffect(() => {
+    if (cardsRef.current) {
+      const cards = gsap.utils.toArray(cardsRef.current.querySelectorAll('.doctor-card'));
+      gsap.from(cards, {
+        y: 40,
+        opacity: 0,
+        stagger: 0.2,
+        duration: 0.8,
+        ease: "power3.out",
+      });
+    }
+  }, [searchTerm, selectedSpecialization]);
 
   // Get unique specializations for filter
   const specializations = useMemo(() => {
@@ -123,14 +140,15 @@ const DoctorConsultation: React.FC = () =>  {
 
         {/* Doctor Cards */}
         {filteredDoctors.length > 0 ? (
-          <div className="space-y-6">
+          <div className="space-y-6" ref={cardsRef}>
             {filteredDoctors.map((doctor) => (
-              <DoctorCardHorizontal
-                key={doctor.id}
-                doctor={doctor}
-                onBookAppointment={handleBookAppointment}
-                onViewProfile={handleViewProfile}
-              />
+              <div key={doctor.id} className="doctor-card">
+                <DoctorCardHorizontal
+                  doctor={doctor}
+                  onBookAppointment={handleBookAppointment}
+                  onViewProfile={handleViewProfile}
+                />
+              </div>
             ))}
           </div>
         ) : (
@@ -155,8 +173,7 @@ const DoctorConsultation: React.FC = () =>  {
         )}
       </main>
 
-
-<Footer/>
+      <Footer/>
 
       {/* Footer */}
       {/* <footer className="bg-gray-50 border-t border-gray-200 mt-16">
