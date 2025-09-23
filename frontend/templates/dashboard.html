@@ -7,30 +7,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BookMyDoc - A doctor appointment booking app</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="{% static 'navbar.css' %}">
-    <link rel="stylesheet" href="{% static 'dashboard.css' %}">
-
+    <link rel="stylesheet" href="{% static 'modern_dashboard.css' %}">
+    <link rel="icon" type="image/png" href="{% static 'bookmydoc_logo.png' %}">
 </head>
 
 <body>
     <nav class="navbar">
         <div class="logo">
-            <img src="{% static 'bookmydoc_logo.png' %}" alt="Logo">
+            <img src="{% static 'bookmydoc_logo.png' %}" alt="BookMyDoc Logo">
         </div>
         <div class="nav-links">
             <button class="symptom-checker-btn" id="symptomChecker">
                 <i class="fas fa-stethoscope"></i>
                 Symptom Checker
             </button>
-            <a href="#find_doc" class="navtab">Find Doc</a>
-            <a href="#treatment" class="navtab">Treatment</a>
-            <a href="#login" class="navtab">Login</a>
+            <a href="#find_doc" class="navtab">Find Doctors</a>
+            <a href="#services" class="navtab">Services</a>
+            <a href="#about" class="navtab">About Us</a>
+            <a href="/login" class="navtab">Login</a>
             <i class="fas fa-user-circle profile-icon" id="profileIcon"></i>
         </div>
-
     </nav>
 
-    <!-- sidebar -->
+    <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <i class="fas fa-times close-btn" id="closeBtn"></i>
         <div class="up">
@@ -38,7 +37,7 @@
                 <li><a href="#"><i class="fas fa-file-medical sidebar-icons"></i> E-Prescription</a></li>
                 <li><a href="#"><i class="fas fa-notes-medical sidebar-icons"></i> Medical History</a></li>
                 <li><a href="#"><i class="fas fa-user-friends sidebar-icons"></i> Family</a></li>
-                <li><a href="#"><i class="fas fa-calendar-check sidebar-icons"></i>Appointments</a></li>
+                <li><a href="#"><i class="fas fa-calendar-check sidebar-icons"></i> Appointments</a></li>
             </ul>
         </div>
         <div class="down">
@@ -48,10 +47,9 @@
                 <li><a href="#logout"><i class="fas fa-sign-out-alt sidebar-icons"></i> Logout</a></li>
             </ul>
         </div>
-
     </div>
 
-    <!-- mobile navbar -->
+    <!-- Mobile Navbar -->
     <div class="mobile-view">
         <div class="mobile-navbar">
             <ul>
@@ -63,14 +61,12 @@
                         <span class="mobile-text">Profile</span>
                     </a>
                 </li>
-
-
                 <li class="mobile-list">
-                    <a href="#">
+                    <a href="#services">
                         <span class="mobile-icon">
                             <i class="fas fa-pills"></i>
                         </span>
-                        <span class="mobile-text">Treatment</span>
+                        <span class="mobile-text">Services</span>
                     </a>
                 </li>
                 <li class="mobile-list">
@@ -78,25 +74,167 @@
                         <span class="mobile-icon">
                             <i class="fas fa-stethoscope m-symptom-icon"></i>
                         </span>
-                        <span class="mobile-text">Symptom Checker</span>
+                        <span class="mobile-text">Symptoms</span>
                     </a>
                 </li>
                 <li class="mobile-list">
-                    <a href="#">
+                    <a href="/login">
                         <span class="mobile-icon">
-                            <i class="fas fa-power-off"></i>
+                            <i class="fas fa-sign-in-alt"></i>
                         </span>
                         <span class="mobile-text">Login</span>
                     </a>
                 </li>
                 <li class="mobile-list">
-                    <a href="#">
+                    <a href="#find_doc">
                         <span class="mobile-icon">
                             <i class="fas fa-user-md"></i>
                         </span>
-                        <span class="mobile-text">Find Doc</span>
+                        <span class="mobile-text">Doctors</span>
                     </a>
                 </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Hero Section -->
+        <section class="hero-section animate-on-scroll">
+            <div class="hero-text">
+                <h1>Your Health, Our Priority</h1>
+                <p>Book appointments with top doctors in your area. Get the best medical care with just a few clicks.</p>
+                <a href="#find_doc" class="hero-btn">Find a Doctor</a>
+            </div>
+            <div class="hero-image">
+                <img src="{% static 'doctors_bk2.png' %}" alt="Doctor">
+            </div>
+        </section>
+
+        <!-- Services Section -->
+        <section id="services">
+            <h2 class="section-title">Our Services</h2>
+            <div class="services-grid">
+                <div class="service-card animate-on-scroll">
+                    <div class="service-icon">
+                        <i class="fas fa-user-md"></i>
+                    </div>
+                    <h3>Find Doctors</h3>
+                    <p>Search and book appointments with top specialists in your area based on your medical needs.</p>
+                </div>
+                <div class="service-card animate-on-scroll">
+                    <div class="service-icon">
+                        <i class="fas fa-stethoscope"></i>
+                    </div>
+                    <h3>Symptom Checker</h3>
+                    <p>Check your symptoms and get preliminary guidance before consulting with a doctor.</p>
+                </div>
+                <div class="service-card animate-on-scroll">
+                    <div class="service-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <h3>Online Booking</h3>
+                    <p>Book appointments online and receive instant confirmations. No more waiting on calls.</p>
+                </div>
+                <div class="service-card animate-on-scroll">
+                    <div class="service-icon">
+                        <i class="fas fa-file-medical"></i>
+                    </div>
+                    <h3>E-Prescriptions</h3>
+                    <p>Get digital prescriptions from your doctor and access them anytime, anywhere.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Doctors Section -->
+        <section id="find_doc">
+            <h2 class="section-title">Top Doctors</h2>
+            <div class="doctors-grid">
+                <div class="doctor-card animate-on-scroll">
+                    <div class="doctor-image">
+                        <img src="{% static 'doctor_bk.png' %}" alt="Doctor">
+                    </div>
+                    <div class="doctor-info">
+                        <h3>Dr. Sarah Johnson</h3>
+                        <div class="doctor-specialty">Cardiologist</div>
+                        <div class="doctor-rating">
+                            <div class="stars">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star-half-alt"></i>
+                            </div>
+                            <span class="rating-count">(120 reviews)</span>
+                        </div>
+                        <button class="book-btn">Book Appointment</button>
+                    </div>
+                </div>
+                <div class="doctor-card animate-on-scroll">
+                    <div class="doctor-image">
+                        <img src="{% static 'doctor_bk.png' %}" alt="Doctor">
+                    </div>
+                    <div class="doctor-info">
+                        <h3>Dr. Michael Chen</h3>
+                        <div class="doctor-specialty">Neurologist</div>
+                        <div class="doctor-rating">
+                            <div class="stars">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <span class="rating-count">(98 reviews)</span>
+                        </div>
+                        <button class="book-btn">Book Appointment</button>
+                    </div>
+                </div>
+                <div class="doctor-card animate-on-scroll">
+                    <div class="doctor-image">
+                        <img src="{% static 'doctor_bk.png' %}" alt="Doctor">
+                    </div>
+                    <div class="doctor-info">
+                        <h3>Dr. Emily Rodriguez</h3>
+                        <div class="doctor-specialty">Dermatologist</div>
+                        <div class="doctor-rating">
+                            <div class="stars">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="far fa-star"></i>
+                            </div>
+                            <span class="rating-count">(85 reviews)</span>
+                        </div>
+                        <button class="book-btn">Book Appointment</button>
+                    </div>
+                </div>
+                <div class="doctor-card animate-on-scroll">
+                    <div class="doctor-image">
+                        <img src="{% static 'doctor_bk.png' %}" alt="Doctor">
+                    </div>
+                    <div class="doctor-info">
+                        <h3>Dr. James Wilson</h3>
+                        <div class="doctor-specialty">Orthopedic Surgeon</div>
+                        <div class="doctor-rating">
+                            <div class="stars">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star-half-alt"></i>
+                            </div>
+                            <span class="rating-count">(112 reviews)</span>
+                        </div>
+                        <button class="book-btn">Book Appointment</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="{% static 'modern_dashboard.js' %}"></script>
 
                 <div class="indicator"></div>
             </ul>

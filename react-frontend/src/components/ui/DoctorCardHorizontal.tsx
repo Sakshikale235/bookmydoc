@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Phone, 
   Mail, 
@@ -134,14 +135,16 @@ export const DoctorCardHorizontal: React.FC<DoctorCardProps> = ({
           </div>
 
           {/* Action Buttons */}
+           {/* <Link to="/book_appointment" className="no-underline"> */}
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
-            <button
-              onClick={() => onBookAppointment(doctor)}
-              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-200"
+            <Link
+                      to={`/book_appointment/${doctor.id}`}
+                      className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-200"
             >
               <Calendar className="w-4 h-4" />
               Book Appointment
-            </button>
+            </Link>
+
             <button
               onClick={() => onViewProfile(doctor)}
               className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 border border-gray-200 hover:border-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-200"

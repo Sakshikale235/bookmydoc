@@ -14,8 +14,8 @@ const SeasonalHealth: React.FC = () => {
   };
 
   return (
-    <section id="seasonal" className="py-10 bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="seasonal" className="py-10 bg-[#1B4F72] ">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 ">
         
         {/* Title */}
         <div className="text-center mb-6">
@@ -23,7 +23,7 @@ const SeasonalHealth: React.FC = () => {
             Health Guide
           </h2> */}
 
-           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
+           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             AI Health Assistant
           </h2>
 

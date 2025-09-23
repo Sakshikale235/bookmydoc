@@ -24,18 +24,19 @@ const Navigation = () => {
   // Check if user is on symptom checker page
   const isSymptomCheckerPage = location.pathname === "/symptom_checker";
   const isDoctorConsultationPage = location.pathname === "/doctor_consultation";
+   const isUserProfilePage = location.pathname === "/user_profile";
 
 
   // Update active item based on current route
   useEffect(() => {
-    if (isSymptomCheckerPage || isDoctorConsultationPage) {
+    if (isSymptomCheckerPage || isDoctorConsultationPage || isUserProfilePage) {
       setActiveItem(""); // Clear all nav item highlights when on symptom checker page
     } else if (location.pathname === "/") {
       setActiveItem("home");
     } else {
       setActiveItem(""); // You can add more route conditions here
     }
-  }, [location.pathname, isSymptomCheckerPage, isDoctorConsultationPage]);
+  }, [location.pathname, isSymptomCheckerPage, isDoctorConsultationPage, isUserProfilePage]);
 
   // Desktop nav animation
   useEffect(() => {
@@ -174,7 +175,9 @@ const Navigation = () => {
                 <LogIn className="h-6 w-6 lg:mr-2" />
                 <span className="hidden lg:inline">Login</span>
               </Button>
+              </Link>
 
+<Link to="/user_profile">
               <Button variant="ghost" className="hover:scale-[1.05]" size="sm">
                 <UserCircle className="h-10 w-10" />
               </Button>
@@ -228,8 +231,8 @@ const Navigation = () => {
                         : "border-primary text-primary hover:bg-[#56CCF2] hover:text-primary-foreground"
                       }
                     `}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
+                  onClick={() => setMobileMenuOpen(false)}
+                >
                     <Search className="h-4 w-4 mr-2" />
                     Symptom Checker
                   </Button>
@@ -244,8 +247,8 @@ const Navigation = () => {
         : "bg-blue-gradient hover:shadow-medical hover:bg-[#56CCF2]"
       }
     `}
-    onClick={() => setMobileMenuOpen(false)}
-  >
+                  onClick={() => setMobileMenuOpen(false)}
+                >
     <User className="h-4 w-4 mr-2" />
     Find Doctor
   </Button>
@@ -257,11 +260,13 @@ const Navigation = () => {
                     <LogIn className="h-4 w-4 mr-2" />
                     Login
                   </Button>
-                  
+                
+                <Link to="/user_profile">
                   <Button variant="ghost" size="sm">
                     <UserCircle className="h-4 w-4" />
                   </Button>
-                </div>
+                  </Link>
+                  </div>
               </div>
             </div>
           </div>

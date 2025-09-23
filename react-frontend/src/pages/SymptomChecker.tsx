@@ -60,9 +60,7 @@ const SymptomChecker: React.FC = () =>  {
       </section>
       */}
 
-      <SeasonalHealth />
-      <Chatbot />
-       <Footer />
+     
       
       {/* Footer */
       /* <footer className="bg-gray-800 text-white py-12">
