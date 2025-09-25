@@ -64,7 +64,7 @@ const Chatbot: React.FC = () => {
           sender: "user",
           timestamp: new Date(),
         });
-        
+
         // Start the questions
         setStep(0);
         pushMessage({
@@ -83,7 +83,7 @@ const Chatbot: React.FC = () => {
           sender: "user",
           timestamp: new Date(),
         });
-        
+
         // Ask for proper greeting
         pushMessage({
           id: (Date.now() + 1).toString(),
@@ -142,6 +142,8 @@ const Chatbot: React.FC = () => {
     setInputText("");
   };
 
+
+  // perfectly working function
   const sendToBackend = async (data: UserInfo) => {
     setIsTyping(true);
     pushMessage({
@@ -152,27 +154,47 @@ const Chatbot: React.FC = () => {
     });
 
     try {
-      const res = await fetch("/api/diagnose/", {
+      const res = await fetch("http://localhost:8000/api/analyze-symptoms/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      const result = await res.json();
+
+      const result = await res.json(); // <-- declare result here ✅
 
       // remove typing message
       setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
 
+      // format result
+      let formattedText = "";
+
+      if (result.possible_diseases) {
+        formattedText += "🧾 **Analysis Result**\n\n";
+        formattedText += `• **Possible Diseases:** ${result.possible_diseases.join(", ")}\n`;
+        formattedText += `• **Severity:** ${result.severity || "Not available"}\n`;
+        formattedText += `• **Doctor Recommendation:** ${result.doctor_recommendation || "Not available"}\n`;
+        formattedText += `• **Advice:** ${result.advice || "No advice given"}\n`;
+        if (result.bmi !== null && result.bmi !== undefined) {
+          formattedText += `• **BMI:** ${result.bmi}\n`;
+        }
+      } else if (result.message) {
+        formattedText = result.message;
+      } else {
+        formattedText = "⚠️ Unexpected response format.";
+      }
+
       pushMessage({
         id: "ai-result",
-        text: JSON.stringify(result, null, 2),
+        text: formattedText,
         sender: "ai",
         timestamp: new Date(),
       });
+
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
       pushMessage({
         id: "ai-error",
-        text: "Network error",
+        text: "❌ Network error or server not responding.",
         sender: "ai",
         timestamp: new Date(),
       });
@@ -180,6 +202,97 @@ const Chatbot: React.FC = () => {
       setIsTyping(false);
     }
   };
+
+//   const sendToBackend = async (data: UserInfo) => {
+//   setIsTyping(true);
+
+//   // Optional: show typing indicator
+//   pushMessage({
+//     id: "ai-typing",
+//     text: "Analyzing your inputs — please wait...",
+//     sender: "ai",
+//     timestamp: new Date(),
+//   });
+
+//   try {
+//     const res = await fetch("http://localhost:8000/api/analyze-symptoms/", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify(data),
+//     });
+
+//     const result = await res.json(); // ✅ declare result here
+
+//     // remove typing message
+//     setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
+
+//     // Send each piece of result as a separate message
+//     if (result.possible_diseases) {
+//       result.possible_diseases.forEach((disease: string, idx: number) => {
+//         pushMessage({
+//           id: `ai-disease-${idx}`,
+//           text: `🧾 Possible disease: ${disease}`,
+//           sender: "ai",
+//           timestamp: new Date(),
+//         });
+//       });
+
+//       pushMessage({
+//         id: "ai-severity",
+//         text: `⚠️ Severity: ${result.severity || "Not available"}`,
+//         sender: "ai",
+//         timestamp: new Date(),
+//       });
+
+//       pushMessage({
+//         id: "ai-doctor",
+//         text: `👨‍⚕️ Doctor Recommendation: ${result.doctor_recommendation || "Not available"}`,
+//         sender: "ai",
+//         timestamp: new Date(),
+//       });
+
+//       pushMessage({
+//         id: "ai-advice",
+//         text: `💡 Advice: ${result.advice || "No advice given"}`,
+//         sender: "ai",
+//         timestamp: new Date(),
+//       });
+
+//       if (result.bmi !== null && result.bmi !== undefined) {
+//         pushMessage({
+//           id: "ai-bmi",
+//           text: `⚖️ BMI: ${result.bmi}`,
+//           sender: "ai",
+//           timestamp: new Date(),
+//         });
+//       }
+//     } else if (result.message) {
+//       pushMessage({
+//         id: "ai-message",
+//         text: result.message,
+//         sender: "ai",
+//         timestamp: new Date(),
+//       });
+//     } else {
+//       pushMessage({
+//         id: "ai-error-format",
+//         text: "⚠️ Unexpected response format.",
+//         sender: "ai",
+//         timestamp: new Date(),
+//       });
+//     }
+//   } catch (err) {
+//     setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
+//     pushMessage({
+//       id: "ai-error",
+//       text: "❌ Network error or server not responding.",
+//       sender: "ai",
+//       timestamp: new Date(),
+//     });
+//   } finally {
+//     setIsTyping(false);
+//   }
+// };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -199,9 +312,8 @@ const Chatbot: React.FC = () => {
           {messages.map((message) => (
             <div key={message.id} className="flex flex-col">
               <div
-                className={`flex items-start space-x-3 ${
-                  message.sender === "user" ? "justify-end" : "justify-start"
-                }`}
+                className={`flex items-start space-x-3 ${message.sender === "user" ? "justify-end" : "justify-start"
+                  }`}
               >
                 {message.sender === "ai" && (
                   <div className="bg-white rounded-full p-2 flex-shrink-0">
@@ -209,13 +321,30 @@ const Chatbot: React.FC = () => {
                   </div>
                 )}
                 <div
-                  className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl ${
-                    message.sender === "user"
-                      ? "bg-white text-gray-800 rounded-br-sm"
-                      : "bg-white text-gray-800 shadow-md rounded-bl-sm"
-                  }`}
+                  className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl ${message.sender === "user"
+                    ? "bg-white text-gray-800 rounded-br-sm"
+                    : "bg-white text-gray-800 shadow-md rounded-bl-sm"
+                    }`}
                 >
-                  <div className="text-sm">{message.text}</div>
+                  {/* <div className="text-sm">{message.text}</div>
+                   */}
+                  <div
+                    className="text-sm whitespace-pre-line"
+                    dangerouslySetInnerHTML={{ __html: message.text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>") }}
+                  ></div>
+
+                  {/* Skip button appears only for optional AI questions */}
+                  {message.sender === "ai" &&
+                    step >= 0 &&
+                    message.text.includes("* skip") && (
+                      <button
+                        onClick={() => handleNext("*")}
+                        className="self-start mt-2 ml-12 px-3 py-1 bg-gray-300 rounded-md text-sm hover:bg-gray-400 transition-colors"
+                      >
+                        Skip
+                      </button>
+                    )}
+
                 </div>
                 {message.sender === "user" && (
                   <div className="bg-white rounded-full p-2 flex-shrink-0">
@@ -225,7 +354,7 @@ const Chatbot: React.FC = () => {
               </div>
 
               {/* Skip button appears only for AI questions with * skip and not during greeting phase */}
-              {message.sender === "ai" && 
+              {message.sender === "ai" &&
                 step >= 0 &&
                 message.text.includes("* skip") && (
                   <button

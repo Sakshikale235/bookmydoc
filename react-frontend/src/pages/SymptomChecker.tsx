@@ -113,9 +113,6 @@ const SymptomChecker: React.FC = () =>  {
       </section>
       */}
 
-<<<<<<< HEAD
-     
-=======
       {/* Seasonal Health */}
       <div id="seasonal" ref={seasonalRef}>
         <SeasonalHealth />
@@ -130,7 +127,6 @@ const SymptomChecker: React.FC = () =>  {
       <div ref={footerRef}>
         <Footer />
       </div>
->>>>>>> 066e4862be5902b1c85c759b026c4b23b71069f5
       
       {/* Footer */
       /* <footer className="bg-gray-800 text-white py-12">
