@@ -154,33 +154,57 @@ const Chatbot: React.FC = () => {
     });
 
     try {
+      // Convert *'s to "Not provided" for the backend
+      const formattedData = {
+        height: data.height === '*' ? 'Not provided' : data.height,
+        weight: data.weight === '*' ? 'Not provided' : data.weight,
+        age: data.age === '*' ? 'Not provided' : data.age,
+        gender: data.gender === '*' ? 'Not provided' : data.gender,
+        location: data.location === '*' ? 'Not provided' : data.location,
+        symptoms: data.symptoms
+      };
+
       const res = await fetch("http://localhost:8000/api/analyze-symptoms/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(formattedData),
       });
 
-      const result = await res.json(); // <-- declare result here ✅
+      const result = await res.json();
 
       // remove typing message
       setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
 
+      if (!res.ok) {
+        throw new Error(result.error || 'Server error');
+      }
+
+      // Try to parse the response if it's a string
+      let parsedResult = result;
+      if (typeof result === 'string') {
+        try {
+          parsedResult = JSON.parse(result);
+        } catch (e) {
+          parsedResult = { message: result };
+        }
+      }
+
       // format result
       let formattedText = "";
 
-      if (result.possible_diseases) {
+      if (parsedResult.possible_diseases) {
         formattedText += "🧾 **Analysis Result**\n\n";
-        formattedText += `• **Possible Diseases:** ${result.possible_diseases.join(", ")}\n`;
-        formattedText += `• **Severity:** ${result.severity || "Not available"}\n`;
-        formattedText += `• **Doctor Recommendation:** ${result.doctor_recommendation || "Not available"}\n`;
-        formattedText += `• **Advice:** ${result.advice || "No advice given"}\n`;
-        if (result.bmi !== null && result.bmi !== undefined) {
-          formattedText += `• **BMI:** ${result.bmi}\n`;
+        formattedText += `• **Possible Diseases:** ${parsedResult.possible_diseases.join(", ")}\n`;
+        formattedText += `• **Severity:** ${parsedResult.severity || "Not available"}\n`;
+        formattedText += `• **Doctor Recommendation:** ${parsedResult.doctor_recommendation || "Not available"}\n`;
+        formattedText += `• **Advice:** ${parsedResult.advice || "No advice given"}\n`;
+        if (parsedResult.bmi !== null && parsedResult.bmi !== undefined) {
+          formattedText += `• **BMI:** ${parsedResult.bmi}\n`;
         }
-      } else if (result.message) {
-        formattedText = result.message;
+      } else if (parsedResult.message) {
+        formattedText = parsedResult.message;
       } else {
-        formattedText = "⚠️ Unexpected response format.";
+        formattedText = typeof parsedResult === 'string' ? parsedResult : "⚠️ Unexpected response format.";
       }
 
       pushMessage({
@@ -194,7 +218,7 @@ const Chatbot: React.FC = () => {
       setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
       pushMessage({
         id: "ai-error",
-        text: "❌ Network error or server not responding.",
+        text: `❌ ${err instanceof Error ? err.message : "Network error or server not responding."}`,
         sender: "ai",
         timestamp: new Date(),
       });
