@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import logo from "@/assets/bookmydoclogo.png";
 import { Search, Stethoscope, User, LogIn, UserCircle, Menu, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -75,7 +76,7 @@ const Navigation = () => {
           {/* Logo */}
           <div className="flex items-center space-x-2">
             <img 
-              src="/src/assets/bookmydoclogo.png" 
+              src={logo} 
               alt="BookMyDoc Logo" 
               className="h-12 w-auto object-contain"
             />
