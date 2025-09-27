@@ -23,6 +23,7 @@ from django.conf.urls.static import static
 # urlpatterns = [
 #     path('admin/', admin.site.urls),
 #     path('', include('home.urls')),  # Include URLs from the home app
+#  path('api/', include('api.urls')),  # Include URLs from the api app
 # ]
 
 from .views import index
@@ -33,4 +34,5 @@ from .views import index
 
 urlpatterns = [
  path('',TemplateView.as_view(template_name="index.html")),  # <-- serves the React app
+   path('api/', include('api.urls')),  # Include URLs from the api app
 ]+ static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])
