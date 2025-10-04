@@ -1,6 +1,6 @@
 // src/pages/LoginPage.tsx
 import React, { useState } from "react";
-import "boxicons/css/boxicons.min.css"; // Boxicons CDN in React
+import "boxicons/css/boxicons.min.css";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 
@@ -28,16 +28,23 @@ const LoginPage = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const email = loginEmail.trim();
+
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: loginEmail,
+      email,
       password: loginPassword,
     });
 
     if (error) {
       alert("Login failed: " + error.message);
+    } else if (data.user?.email_confirmed_at === null) {
+      alert("Please confirm your email before logging in.");
     } else {
-      alert("Login successful!");
-      navigate("/index");
+      // ✅ Set logged in for ProtectedRoute
+      localStorage.setItem("isLoggedIn", "true");
+
+      // ✅ Redirect to /index
+      navigate("/index", { replace: true });
     }
   };
 
@@ -50,8 +57,16 @@ const LoginPage = () => {
       return;
     }
 
+    const email = regEmail.trim();
+
+    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
+    if (!emailPattern.test(email)) {
+      alert("Please enter a valid email in format: name.name@gmail.com");
+      return;
+    }
+
     const { data, error } = await supabase.auth.signUp({
-      email: regEmail,
+      email,
       password: regPassword,
       options: {
         data: {
@@ -67,7 +82,8 @@ const LoginPage = () => {
       alert("Registration failed: " + error.message);
     } else {
       alert("Registration successful! Please check your email for confirmation.");
-      setIsActive(false); // Switch to login form
+      setIsActive(false);
+
       // Clear form
       setRegName("");
       setRegPhone("");
