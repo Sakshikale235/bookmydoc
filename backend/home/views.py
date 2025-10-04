@@ -1,15 +1,19 @@
 from django.http import JsonResponse
+from django.contrib.auth.models import User
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
+import json
 
 def register(request):
     if request.method == 'POST':
-        username = request.POST.get('username')
-        email    = request.POST.get('email')
-        password = request.POST.get('password')
-        confirm  = request.POST.get('confirm_password')
+        data = json.loads(request.body)
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        confirm = data.get('confirm_password')
 
         if password != confirm:
             return JsonResponse({"success": False, "error": "Passwords do not match"})
-        
+
         if User.objects.filter(username=username).exists():
             return JsonResponse({"success": False, "error": "Username already exists"})
 
@@ -19,11 +23,11 @@ def register(request):
 
     return JsonResponse({"success": False, "error": "Invalid request"})
 
-
 def login(request):
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
+        data = json.loads(request.body)
+        username = data.get('username')
+        password = data.get('password')
 
         user = authenticate(request, username=username, password=password)
         if user is not None:
@@ -33,6 +37,7 @@ def login(request):
             return JsonResponse({"success": False, "error": "Invalid credentials"})
 
     return JsonResponse({"success": False, "error": "Invalid request"})
+
 
 
 

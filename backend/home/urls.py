@@ -15,8 +15,8 @@ from home import views
 
 urlpatterns = [
     path('', views.dashboard, name="home"),
-    path('auth', views.auth_page, name="auth_page"),  # Only this renders the login/register UI
-    path('login', views.login, name="login"),         # Only POSTs come here
-    path('register', views.register, name="register"),# Only POSTs come here
-    path('logout', views.logoutuser, name="logout"),
+    path('auth/', views.auth_page, name="auth_page"),          # Renders login/register UI
+    path('login/', views.login_user, name="login"),           # Handles login POST
+    path('register/', views.register_user, name="register"), # Handles register POST
+    path('logout/', views.logout_user, name="logout"),
 ]
