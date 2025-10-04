@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot } from 'lucide-react';
+import { supabase } from "@/lib/supabaseClient";
 import Navigation from '@/components/Navigation';
 import SeasonalHealth from '@/components/ui/SeasonalHealth';
 import Chatbot from '@/components/ui/Chatbot';
@@ -7,7 +8,9 @@ import Footer from '@/components/Footer';
 import gsap from 'gsap';
 
 const SymptomChecker: React.FC = () =>  {
+  // const [user, setUser] = useState(supabase.auth.user()); // current user
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+   const [loading, setLoading] = useState(true);
 
   // Refs for gsap animations
   const navRef = useRef<HTMLDivElement>(null);
@@ -24,6 +27,20 @@ const SymptomChecker: React.FC = () =>  {
       .from(chatbotRef.current, { scale: 0.8, opacity: 0 }, "-=0.3")
       .from(footerRef.current, { y: 80, opacity: 0 }, "-=0.4");
   }, []);
+
+  //  useEffect(() => {
+  //   // Listen to auth state changes
+  //   const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+  //     setUser(session?.user ?? null);
+  //     setLoading(false);
+  //   });
+
+  //   setLoading(false); // initial load
+
+  //   return () => {
+  //     listener.subscription.unsubscribe();
+  //   };
+  // }, []);
 
   // Animate symptoms list on mount + hover
   useEffect(() => {
@@ -83,35 +100,7 @@ const SymptomChecker: React.FC = () =>  {
       <Chatbot />
        <Footer />
 
-      {/* Hero Section */}
-      {/*
-      <section className="bg-gradient-to-br from-blue-600 via-blue-700 to-teal-600 py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
-            Your Winter Health
-            <span className="block text-teal-200">Companion</span>
-          </h1>
-          <p className="text-xl md:text-2xl text-blue-100 mb-8 leading-relaxed">
-            Get expert guidance on seasonal health issues and chat with our AI assistant 
-            for personalized health advice
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button 
-              onClick={() => smoothScroll('seasonal')}
-              className="bg-white text-blue-600 px-8 py-4 rounded-xl font-semibold hover:bg-blue-50 transition-all duration-300 transform hover:scale-105 shadow-lg"
-            >
-              Explore Health Guide
-            </button>
-            <button 
-              onClick={() => smoothScroll('chatbot')}
-              className="bg-teal-500 text-white px-8 py-4 rounded-xl font-semibold hover:bg-teal-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
-            >
-              Chat with AI
-            </button>
-          </div>
-        </div>
-      </section>
-      */}
+        
 
       {/* Seasonal Health */}
       <div id="seasonal" ref={seasonalRef}>
@@ -128,59 +117,7 @@ const SymptomChecker: React.FC = () =>  {
         <Footer />
       </div>
       
-      {/* Footer */
-      /* <footer className="bg-gray-800 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="bg-blue-600 p-2 rounded-lg">
-                  <Bot className="h-6 w-6 text-white" />
-                </div>
-                <span className="text-xl font-bold">HealthGuide</span>
-              </div>
-              <p className="text-gray-400">
-                Your trusted companion for seasonal health information and AI-powered health assistance.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-              <ul className="space-y-2">
-                <li>
-                  <button onClick={() => smoothScroll('seasonal')} className="text-gray-400 hover:text-white transition-colors duration-200">
-                    Seasonal Health
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => smoothScroll('chatbot')} className="text-gray-400 hover:text-white transition-colors duration-200">
-                    AI Assistant
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => smoothScroll('about')} className="text-gray-400 hover:text-white transition-colors duration-200">
-                    About Us
-                  </button>
-                </li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Important Notice</h3>
-              <p className="text-gray-400 text-sm">
-                This platform provides general health information only. Always consult qualified healthcare 
-                professionals for medical advice, diagnosis, and treatment.
-              </p>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-700 mt-8 pt-8 text-center">
-            <p className="text-gray-400">
-              © 2025 HealthGuide. All rights reserved. | Built with care for your health.
-            </p>
-          </div>
-        </div>
-      </footer> */}
+     
     </div>
   );
 }

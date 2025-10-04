@@ -11,6 +11,7 @@ import gsap from 'gsap';
 const DoctorConsultation: React.FC = () =>  {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSpecialization, setSelectedSpecialization] = useState('');
+  const [location, setLocation] = useState("");
 
   const cardsRef = useRef<HTMLDivElement | null>(null);
 
@@ -112,6 +113,8 @@ const DoctorConsultation: React.FC = () =>  {
             selectedSpecialization={selectedSpecialization}
             onSpecializationChange={handleSpecializationChange}
             specializations={specializations}
+              location={location}
+  onLocationChange={setLocation}
           />
         </div>
 
@@ -175,16 +178,6 @@ const DoctorConsultation: React.FC = () =>  {
 
       <Footer/>
 
-      {/* Footer */}
-      {/* <footer className="bg-gray-50 border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-gray-600">
-            <p className="text-sm">
-              © 2025 Find Your Doctor. Connecting patients with trusted healthcare professionals.
-            </p>
-          </div>
-        </div>
-      </footer> */}
     </div>
   );
 }
