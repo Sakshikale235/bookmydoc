@@ -1,9 +1,83 @@
 // src/pages/LoginPage.tsx
 import React, { useState } from "react";
 import "boxicons/css/boxicons.min.css"; // Boxicons CDN in React
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabaseClient";
 
 const LoginPage = () => {
+  const navigate = useNavigate();
+
+  // LOGIN STATES
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+
+  // REGISTER STATES
+  const [regName, setRegName] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+
+  // REGISTER CHECKBOX STATES
+  const [termsChecked, setTermsChecked] = useState(false);
+  const [locationChecked, setLocationChecked] = useState(false);
+
+  // Toggle between login and register
   const [isActive, setIsActive] = useState(false);
+
+  // LOGIN with Supabase
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword,
+    });
+
+    if (error) {
+      alert("Login failed: " + error.message);
+    } else {
+      alert("Login successful!");
+      navigate("/index");
+    }
+  };
+
+  // REGISTER with Supabase
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!termsChecked || !locationChecked) {
+      alert("You must accept the Terms and allow location to register.");
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email: regEmail,
+      password: regPassword,
+      options: {
+        data: {
+          name: regName,
+          phone: regPhone,
+          termsAccepted: termsChecked,
+          locationAllowed: locationChecked,
+        },
+      },
+    });
+
+    if (error) {
+      alert("Registration failed: " + error.message);
+    } else {
+      alert("Registration successful! Please check your email for confirmation.");
+      setIsActive(false); // Switch to login form
+      // Clear form
+      setRegName("");
+      setRegPhone("");
+      setRegEmail("");
+      setRegPassword("");
+      setTermsChecked(false);
+      setLocationChecked(false);
+    }
+  };
+
 
   // Style objects
   const globalStyles: React.CSSProperties = {
@@ -283,14 +357,16 @@ const LoginPage = () => {
       <div style={containerStyles} className={`container ${isActive ? "active" : ""}`}>
         {/* Login form */}
         <div style={isActive ? formBoxActiveStyles : formBoxStyles} className="form-box">
-          <form style={formStyles}>
+          <form style={formStyles} onSubmit={handleLogin}>
             <h1 style={h1Styles}>Login</h1>
             <div style={inputBoxStyles}>
-              <input type="text" placeholder="Username" required style={inputStyles} />
+              <input type="email" placeholder="Email" required style={inputStyles} value={loginEmail}
+  onChange={(e) => setLoginEmail(e.target.value)}/>
               <i className="bx bxs-user" style={iconStyles}></i>
             </div>
             <div style={inputBoxStyles}>
-              <input type="password" placeholder="Password" required style={inputStyles} />
+              <input type="password" placeholder="Password" required style={inputStyles} value={loginPassword}
+  onChange={(e) => setLoginPassword(e.target.value)}/>
               <i className="bx bxs-lock-alt" style={iconStyles}></i>
             </div>
             <div style={forgotLinkStyles}>
@@ -311,30 +387,32 @@ const LoginPage = () => {
 
         {/* Registration form */}
         <div style={isActive ? formBoxRegisterActiveStyles : formBoxRegisterStyles} className="form-box">
-          <form style={formStyles}>
+          <form style={formStyles} onSubmit={handleRegister}>
             <h1 style={h1Styles}>Register</h1>
             <div style={inputBoxStyles}>
-              <input type="text" placeholder="Name" required style={inputStyles} />
+              <input type="text" placeholder="Name" required style={inputStyles} value={regName} onChange={(e) => setRegName(e.target.value)}/>
               <i className="bx bxs-user" style={iconStyles}></i>
             </div>
             <div style={inputBoxStyles}>
-              <input type="tel" placeholder="Phone" required style={inputStyles} />
+              <input type="tel" placeholder="Phone" required style={inputStyles} value={regPhone} onChange={(e) => setRegPhone(e.target.value)}/>
               <i className="bx bxs-phone" style={iconStyles}></i>
             </div>
             <div style={inputBoxStyles}>
-              <input type="email" placeholder="Email" required style={inputStyles} />
+              <input type="email" placeholder="Email" required style={inputStyles} value={regEmail} onChange={(e) => setRegEmail(e.target.value)}/>
               <i className="bx bxs-envelope" style={iconStyles}></i>
             </div>
             <div style={inputBoxStyles}>
-              <input type="password" placeholder="Create Password" required style={inputStyles} />
+              <input type="password" placeholder="Create Password" required style={inputStyles} value={regPassword} onChange={(e) => setRegPassword(e.target.value)}/>
               <i className="bx bxs-lock-alt" style={iconStyles}></i>
             </div>
             <div style={checkboxStyles}>
-              <input type="checkbox" id="terms" required style={checkboxInputStyles} />
+              <input type="checkbox" id="terms" required style={checkboxInputStyles} checked={termsChecked}
+    onChange={(e) => setTermsChecked(e.target.checked)}/>
               <label htmlFor="terms" style={checkboxLabelStyles}>I agree to the <a href="#" style={linkStyles}>Terms of Service</a> and <a href="#" style={linkStyles}>Privacy Policy</a>.</label>
             </div>
             <div style={checkboxStyles}>
-              <input type="checkbox" id="location" required style={checkboxInputStyles} />
+              <input type="checkbox" id="location" required style={checkboxInputStyles} checked={locationChecked}
+    onChange={(e) => setLocationChecked(e.target.checked)}/>
               <label htmlFor="location" style={checkboxLabelStyles}>I allow this app to access my location for health insights.</label>
             </div>
             <button type="submit" style={btnStyles}>
