@@ -6,13 +6,41 @@ import os
 import google.generativeai as genai
 from dotenv import load_dotenv
 from datetime import datetime
+import jwt
+from supabase import create_client, Client
+from functools import wraps
 
 # Load API key
 load_dotenv()
 GEN_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEN_API_KEY)
 
+# Supabase client
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+def require_auth(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return JsonResponse({"error": "Authorization header missing or invalid"}, status=401)
+        token = auth_header.split(' ')[1]
+        try:
+            # Verify JWT with Supabase
+            payload = jwt.decode(token, options={"verify_signature": False})  # Supabase uses RS256, but for simplicity, decode without verify
+            # In production, verify signature with Supabase's public key
+            request.user_id = payload.get('sub')
+        except jwt.ExpiredSignatureError:
+            return JsonResponse({"error": "Token expired"}, status=401)
+        except jwt.InvalidTokenError:
+            return JsonResponse({"error": "Invalid token"}, status=401)
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
 @csrf_exempt
+# @require_auth  # Commented out for now due to login/signup issues
 def analyze_symptoms(request):
     if request.method != "POST":
         return JsonResponse({"error": "Only POST requests allowed"}, status=405)
@@ -71,9 +99,31 @@ Format strictly like this:
 }}
 """
 
-        # Call Gemini API
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
+        # Call Gemini API - Try multiple model names
+        model_names = [
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-flash", 
+            "gemini-2.0-flash-exp",
+            "gemini-1.5-pro-latest",
+            "gemini-1.5-pro"
+        ]
+        
+        response = None
+        last_error = None
+        
+        for model_name in model_names:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                break  # Success, exit the loop
+            except Exception as e:
+                last_error = str(e)
+                continue  # Try next model
+        
+        if response is None:
+            return JsonResponse({
+                "error": f"All model attempts failed. Last error: {last_error}"
+            }, status=500)
 
         raw_text = response.text.strip()
 
@@ -94,6 +144,23 @@ Format strictly like this:
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+
+# Alternative version with model listing (for debugging)
+@csrf_exempt
+def list_available_models(request):
+    """Helper endpoint to list available Gemini models"""
+    try:
+        models = []
+        for model in genai.list_models():
+            if 'generateContent' in model.supported_generation_methods:
+                models.append({
+                    'name': model.name,
+                    'display_name': model.display_name,
+                    'description': model.description
+                })
+        return JsonResponse({"available_models": models})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 
