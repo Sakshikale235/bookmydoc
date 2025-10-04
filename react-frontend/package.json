@@ -44,11 +44,8 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/supabase-js": "^2.58.0",
     "@tanstack/react-query": "^5.83.0",
-<<<<<<< HEAD
-    "boxicons": "^2.1.4",
-=======
     "axios": "^1.12.2",
->>>>>>> 09b228146f970d4eace8a3f5021f83c10ad1dcf9
+    "boxicons": "^2.1.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

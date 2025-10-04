@@ -96,7 +96,7 @@ const Chatbot: React.FC = () => {
       }
     }
 
-    let val = value.trim() || "*"; // treat empty input as skipped
+    const val = value.trim() || "*"; // treat empty input as skipped
     switch (step) {
       case 0:
         setUserInfo((p) => ({ ...p, age: val }));

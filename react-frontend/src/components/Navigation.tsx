@@ -4,7 +4,6 @@ import { Search, Stethoscope, User, LogIn, UserCircle, Menu, X } from "lucide-re
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import gsap from "gsap";
-import logo from "@/assets/bookmydoclogo.png";
 
 const Navigation = () => {
   const location = useLocation();
