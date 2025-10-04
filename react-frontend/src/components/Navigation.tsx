@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import logo from "@/assets/bookmydoclogo.png";
 import { Search, Stethoscope, User, LogIn, UserCircle, Menu, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import logo from "@/assets/bookmydoclogo.png";
 import { Link, useLocation } from "react-router-dom";
 import gsap from "gsap";
 
