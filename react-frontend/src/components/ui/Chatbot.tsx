@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Loader } from "lucide-react";
+import { supabase } from "../../lib/supabaseClient";
 
 type Message = {
   id: string;
@@ -9,30 +10,94 @@ type Message = {
 };
 
 type UserInfo = {
-  age?: string | "*";
-  gender?: string | "*";
-  height?: string | "*";
-  weight?: string | "*";
-  location?: string | "*";
+  id?: string;
+  auth_id?: string;
+  age?: number | null;
+  gender?: string | null;
+  height?: number | null;
+  weight?: number | null;
+  location?: string | null;
+  address?: string | null;
   symptoms?: string;
+  blood_group?: string | null;
+  full_name?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 const Chatbot: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      text: "Hello! Welcome to your AI health assistant. I'm here to help analyze your symptoms and provide guidance. To get started, please say 'Hi' or 'Hello' and I'll begin asking you some questions.",
-      sender: "ai",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [patientDataFetched, setPatientDataFetched] = useState(false);
+  const [dataConfirmed, setDataConfirmed] = useState(false);
+  const [updatingField, setUpdatingField] = useState<string | null>(null);
 
-  const [step, setStep] = useState<number>(-1); // Start with -1 to wait for greeting
+  const [step, setStep] = useState<number | 'doctor_suggestion'>(-1); // Start with -1 to wait for greeting
   const [userInfo, setUserInfo] = useState<UserInfo>({});
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [lastAnalysisResult, setLastAnalysisResult] = useState<any>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch patient data on component mount
+  useEffect(() => {
+    const fetchPatientData = async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+
+        const { data: patientData, error } = await supabase
+          .from("patients")
+          .select("*")
+          .eq("auth_id", authUser.id)
+          .single();
+
+        if (error) throw error;
+
+        if (patientData) {
+          setUserInfo({
+            id: patientData.id,
+            auth_id: patientData.auth_id,
+            full_name: patientData.full_name,
+            age: patientData.age,
+            gender: patientData.gender,
+            height: patientData.height,
+            weight: patientData.weight,
+            blood_group: patientData.blood_group,
+            address: patientData.address,
+            location: patientData.address // Using address as location
+          });
+          setPatientDataFetched(true);
+
+          // Initial greeting with patient data
+          setMessages([{
+            id: "1",
+            text: `Hello ${patientData.full_name}! I have your health information. Let me confirm if these details are correct:\n\n` +
+                  `Age: ${patientData.age || 'Not provided'}\n` +
+                  `Gender: ${patientData.gender || 'Not provided'}\n` +
+                  `Height: ${patientData.height ? patientData.height + ' cm' : 'Not provided'}\n` +
+                  `Weight: ${patientData.weight ? patientData.weight + ' kg' : 'Not provided'}\n` +
+                  `Blood Group: ${patientData.blood_group || 'Not provided'}\n` +
+                  `Address: ${patientData.address || 'Not provided'}\n\n` +
+                  `Are these details correct? Please reply with 'yes' or 'no'.`,
+            sender: "ai",
+            timestamp: new Date(),
+          }]);
+        }
+      } catch (error) {
+        console.error('Error fetching patient data:', error);
+        // Fall back to default greeting if fetch fails
+        setMessages([{
+          id: "1",
+          text: "Hello! Welcome to your AI health assistant. I'm here to help analyze your symptoms and provide guidance. To get started, please say 'Hi' or 'Hello'.",
+          sender: "ai",
+          timestamp: new Date(),
+        }]);
+      }
+    };
+
+    fetchPatientData();
+  }, []);
 
   const steps = [
     "What is your age?",
@@ -52,70 +117,226 @@ const Chatbot: React.FC = () => {
 
   const pushMessage = (msg: Message) => setMessages((p) => [...p, msg]);
 
-  const handleNext = (value: string) => {
-    // Check if it's the initial greeting
-    if (step === -1) {
-      const greeting = value.toLowerCase().trim();
-      if (greeting.includes('hi') || greeting.includes('hello') || greeting.includes('hey')) {
-        // Add user greeting
+  const handleNext = async (value: string) => {
+    const userResponse = value.toLowerCase().trim();
+    
+    // Add user message to chat
+    pushMessage({
+      id: Date.now().toString(),
+      text: value,
+      sender: "user",
+      timestamp: new Date(),
+    });
+
+    // Handle data confirmation flow
+    if (patientDataFetched && !dataConfirmed) {
+      if (userResponse === 'yes') {
+        setDataConfirmed(true);
         pushMessage({
           id: Date.now().toString(),
-          text: value,
-          sender: "user",
-          timestamp: new Date(),
-        });
-
-        // Start the questions
-        setStep(0);
-        pushMessage({
-          id: (Date.now() + 1).toString(),
-          text: "Great! I'll ask you a few questions to help analyze your symptoms. You can skip optional questions by typing '*' or clicking Skip. Let's start:\n\n" + steps[0],
+          text: "Great! Please describe your symptoms in detail so I can help you find the right specialist.",
           sender: "ai",
           timestamp: new Date(),
         });
-        setInputText("");
-        return;
-      } else {
-        // Add user message
+        setStep(5); // Skip to symptoms step
+      } else if (userResponse === 'no') {
         pushMessage({
           id: Date.now().toString(),
-          text: value,
-          sender: "user",
-          timestamp: new Date(),
-        });
-
-        // Ask for proper greeting
-        pushMessage({
-          id: (Date.now() + 1).toString(),
-          text: "Please greet me with 'Hi' or 'Hello' to start our conversation!",
+          text: "Which information needs to be updated? Please specify the field (age/gender/height/weight/blood group).",
           sender: "ai",
           timestamp: new Date(),
         });
-        setInputText("");
+        setUpdatingField('waiting_for_field');
+      } else if (updatingField === 'waiting_for_field') {
+        // Handle field selection
+        const field = userResponse;
+        let validField = true;
+        switch (field) {
+          case 'age':
+          case 'gender':
+          case 'height':
+          case 'weight':
+          case 'blood group':
+          case 'address':
+            setUpdatingField(field);
+            pushMessage({
+              id: Date.now().toString(),
+              text: `Please enter your new ${field}:`,
+              sender: "ai",
+              timestamp: new Date(),
+            });
+            break;
+          default:
+            validField = false;
+            pushMessage({
+              id: Date.now().toString(),
+              text: "Please specify a valid field (age/gender/height/weight/blood group/address):",
+              sender: "ai",
+              timestamp: new Date(),
+            });
+        }
+        if (!validField) return;
+      } else if (updatingField) {
+        // Handle field update
+        const updateData: Partial<UserInfo> = {};
+        const newValue = userResponse;
+
+        switch (updatingField) {
+          case 'age':
+            updateData.age = parseInt(newValue) || null;
+            break;
+          case 'gender':
+            updateData.gender = newValue;
+            break;
+          case 'height':
+            updateData.height = parseFloat(newValue) || null;
+            break;
+          case 'weight':
+            updateData.weight = parseFloat(newValue) || null;
+            break;
+          case 'blood group':
+            updateData.blood_group = newValue;
+            break;
+          case 'address':
+            updateData.address = newValue;
+            break;
+        }
+
+        // Update in database
+        if (userInfo.id) {
+          try {
+            const { error } = await supabase
+              .from("patients")
+              .update(updateData)
+              .eq("id", userInfo.id);
+
+            if (error) throw error;
+
+            setUserInfo(prev => ({ ...prev, ...updateData }));
+            pushMessage({
+              id: Date.now().toString(),
+              text: `${updatingField} updated successfully. Are all other details correct now? (yes/no)`,
+              sender: "ai",
+              timestamp: new Date(),
+            });
+            setUpdatingField(null);
+          } catch (error) {
+            console.error('Error updating patient data:', error);
+            pushMessage({
+              id: Date.now().toString(),
+              text: "There was an error updating your information. Please try again.",
+              sender: "ai",
+              timestamp: new Date(),
+            });
+          }
+        }
         return;
       }
+      setInputText("");
+      return;
     }
 
+    // Handle doctor suggestion response
+    if (step === 'doctor_suggestion') {
+      if (userResponse === 'yes') {
+        setIsTyping(true);
+        try {
+          if (!lastAnalysisResult?.recommended_specialty) {
+            throw new Error("No specialty recommendation available");
+          }
+
+          const { data: doctors, error } = await supabase
+            .from('doctors')
+            .select(`
+              *,
+              doctor_specialties!inner(
+                specialties!inner(name)
+              )
+            `)
+            .eq('doctor_specialties.specialties.name', lastAnalysisResult.recommended_specialty)
+            .order('experience', { ascending: false })
+            .limit(3);
+
+          if (error) throw error;
+
+          if (doctors && doctors.length > 0) {
+            let doctorText = "👨‍⚕️ **Here are some recommended doctors in your area:**\n\n";
+            doctors.forEach((doctor: any) => {
+              doctorText += `• **Dr. ${doctor.full_name}**\n`;
+              doctorText += `  📚 ${doctor.experience} years of experience\n`;
+              doctorText += `  🏥 ${doctor.clinic_name}\n`;
+              doctorText += `  💰 Consultation Fee: ₹${doctor.consultation_fee}\n`;
+              doctorText += `  📞 ${doctor.phone}\n\n`;
+            });
+            pushMessage({
+              id: "ai-doctors",
+              text: doctorText,
+              sender: "ai",
+              timestamp: new Date(),
+            });
+          } else {
+            pushMessage({
+              id: "ai-no-doctors",
+              text: "I couldn't find any specialists in your area at the moment. Please consider consulting a general physician.",
+              sender: "ai",
+              timestamp: new Date(),
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching doctors:', err);
+          pushMessage({
+            id: "ai-error",
+            text: "Sorry, I encountered an error while searching for doctors. Please try again later.",
+            sender: "ai",
+            timestamp: new Date(),
+          });
+        } finally {
+          setIsTyping(false);
+        }
+      } else if (userResponse === 'no') {
+        pushMessage({
+          id: "ai-goodbye",
+          text: "Alright! If you need any other assistance, feel free to ask. Take care!",
+          sender: "ai",
+          timestamp: new Date(),
+        });
+      } else {
+        pushMessage({
+          id: "ai-invalid",
+          text: "Please reply with 'yes' or 'no'.",
+          sender: "ai",
+          timestamp: new Date(),
+        });
+      }
+      setInputText("");
+      return;
+    }
+
+    // If data is confirmed, proceed with regular flow
+    if (!dataConfirmed) return;
+
     const val = value.trim() || "*"; // treat empty input as skipped
-    switch (step) {
-      case 0:
-        setUserInfo((p) => ({ ...p, age: val }));
-        break;
-      case 1:
-        setUserInfo((p) => ({ ...p, gender: val }));
-        break;
-      case 2:
-        setUserInfo((p) => ({ ...p, height: val }));
-        break;
-      case 3:
-        setUserInfo((p) => ({ ...p, weight: val }));
-        break;
-      case 4:
-        setUserInfo((p) => ({ ...p, location: val }));
-        break;
-      case 5:
-        setUserInfo((p) => ({ ...p, symptoms: val }));
-        break;
+    if (typeof step === 'number') {
+      switch (step) {
+        case 0:
+          setUserInfo((p) => ({ ...p, age: parseInt(val) || null }));
+          break;
+        case 1:
+          setUserInfo((p) => ({ ...p, gender: val }));
+          break;
+        case 2:
+          setUserInfo((p) => ({ ...p, height: parseFloat(val) || null }));
+          break;
+        case 3:
+          setUserInfo((p) => ({ ...p, weight: parseFloat(val) || null }));
+          break;
+        case 4:
+          setUserInfo((p) => ({ ...p, location: val }));
+          break;
+        case 5:
+          setUserInfo((p) => ({ ...p, symptoms: val }));
+          break;
+      }
     }
 
     // Add user message
@@ -148,22 +369,27 @@ const Chatbot: React.FC = () => {
     setIsTyping(true);
     pushMessage({
       id: "ai-typing",
-      text: "Analyzing your inputs — please wait...",
+      text: "Analyzing your symptoms and finding suitable doctors...",
       sender: "ai",
       timestamp: new Date(),
     });
 
     try {
-      // Convert *'s to "Not provided" for the backend
+      // Format the data for the backend including current date
       const formattedData = {
-        height: data.height === '*' ? 'Not provided' : data.height,
-        weight: data.weight === '*' ? 'Not provided' : data.weight,
-        age: data.age === '*' ? 'Not provided' : data.age,
-        gender: data.gender === '*' ? 'Not provided' : data.gender,
-        location: data.location === '*' ? 'Not provided' : data.location,
-        symptoms: data.symptoms
+        height: data.height,
+        weight: data.weight,
+        age: data.age,
+        gender: data.gender,
+        location: data.location,
+        address: data.address,
+        symptoms: data.symptoms,
+        latitude: userInfo.latitude,
+        longitude: userInfo.longitude,
+        date: new Date().toISOString()
       };
 
+      // First get the analysis and recommended specialties
       const res = await fetch("http://localhost:8000/api/analyze-symptoms/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -189,30 +415,77 @@ const Chatbot: React.FC = () => {
         }
       }
 
+      // Store the parsed result for later use
+      setLastAnalysisResult(parsedResult);
+
       // format result
       let formattedText = "";
 
       if (parsedResult.possible_diseases) {
-        formattedText += "🧾 **Analysis Result**\n\n";
-        formattedText += `• **Possible Diseases:** ${parsedResult.possible_diseases.join(", ")}\n`;
-        formattedText += `• **Severity:** ${parsedResult.severity || "Not available"}\n`;
-        formattedText += `• **Doctor Recommendation:** ${parsedResult.doctor_recommendation || "Not available"}\n`;
-        formattedText += `• **Advice:** ${parsedResult.advice || "No advice given"}\n`;
-        if (parsedResult.bmi !== null && parsedResult.bmi !== undefined) {
-          formattedText += `• **BMI:** ${parsedResult.bmi}\n`;
+        formattedText += "🧾 **Based on your symptoms, location, and the current season, here's my analysis:**\n\n";
+        formattedText += `• **Possible Conditions:** ${parsedResult.possible_diseases.join(", ")}\n\n`;
+        
+        if (parsedResult.seasonal_analysis) {
+          formattedText += `🌡️ **Seasonal Context:**\n${parsedResult.seasonal_analysis}\n\n`;
         }
+        
+        formattedText += `💡 **Advice:** ${parsedResult.advice || "No specific advice available"}\n\n`;
+        
+        // Fetch doctors based on recommended specialty
+        if (parsedResult.recommended_specialty) {
+          try {
+            const { data: doctors, error } = await supabase
+              .from('doctors')
+              .select(`
+                *,
+                doctor_specialties!inner(
+                  specialties!inner(name)
+                )
+              `)
+              .eq('doctor_specialties.specialties.name', parsedResult.recommended_specialty)
+              .order('experience', { ascending: false })
+              .limit(3);
+
+            if (!error && doctors?.length > 0) {
+              formattedText += "\n👨‍⚕️ **Recommended Doctors:**\n";
+              doctors.forEach((doctor: any) => {
+                formattedText += `\n• Dr. ${doctor.full_name}\n`;
+                formattedText += `  Experience: ${doctor.experience} years\n`;
+                formattedText += `  Clinic: ${doctor.clinic_name}\n`;
+                formattedText += `  Fee: ₹${doctor.consultation_fee}\n`;
+                formattedText += `  📞 ${doctor.phone}\n`;
+              });
+            }
+          } catch (err) {
+            console.error('Error fetching doctors:', err);
+          }
+        }
+
+        formattedText += `\n💡 **Additional Notes:** ${parsedResult.additional_notes || "No additional notes"}\n`;
       } else if (parsedResult.message) {
         formattedText = parsedResult.message;
       } else {
         formattedText = typeof parsedResult === 'string' ? parsedResult : "⚠️ Unexpected response format.";
       }
 
+      // Send analysis result
       pushMessage({
         id: "ai-result",
         text: formattedText,
         sender: "ai",
         timestamp: new Date(),
       });
+
+      // Ask about doctor suggestions
+      setTimeout(() => {
+        pushMessage({
+          id: "ai-doctor-prompt",
+          text: "Would you like me to suggest some doctors nearby who specialize in treating these conditions? (yes/no)",
+          sender: "ai",
+          timestamp: new Date(),
+        });
+        setStep("doctor_suggestion");
+      }, 1000);
 
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
@@ -359,7 +632,8 @@ const Chatbot: React.FC = () => {
 
                   {/* Skip button appears only for optional AI questions */}
                   {message.sender === "ai" &&
-                    step >= 0 &&
+                    typeof step === 'number' &&
+                    typeof step === 'number' && step >= 0 &&
                     message.text.includes("* skip") && (
                       <button
                         onClick={() => handleNext("*")}
@@ -379,7 +653,7 @@ const Chatbot: React.FC = () => {
 
               {/* Skip button appears only for AI questions with * skip and not during greeting phase */}
               {message.sender === "ai" &&
-                step >= 0 &&
+                typeof step === 'number' && step >= 0 &&
                 message.text.includes("* skip") && (
                   <button
                     onClick={() => handleNext("*")}
@@ -438,320 +712,3 @@ const Chatbot: React.FC = () => {
 };
 
 export default Chatbot;
-
-
-
-// // src/components/ui/Chatbot.tsx
-// import React, { useState, useRef, useEffect } from 'react';
-// import { Send, Bot, User, Loader } from 'lucide-react';
-// import { Message } from '@/types';
-
-// type UserInfo = {
-//   age?: string | null;
-//   gender?: string | null;
-//   height?: string | null;
-//   weight?: string | null;
-// };
-
-// type Step =
-//   | 'greet'
-//   | 'ask_age'
-//   | 'ask_gender'
-//   | 'ask_height'
-//   | 'ask_weight'
-//   | 'ask_symptoms'
-//   | 'waiting'
-//   | 'done';
-
-// const Chatbot: React.FC = () => {
-//   const [messages, setMessages] = useState<Message[]>([
-//     {
-//       id: '1',
-//       text:
-//         "Hi! I'm your AI health assistant. I'll help analyze symptoms. I'll ask a few optional questions (age, gender, height, weight). You can skip any except symptoms. Ready?",
-//       sender: 'ai',
-//       timestamp: new Date()
-//     }
-//   ]);
-
-//   const [step, setStep] = useState<Step>('greet');
-//   const [userInfo, setUserInfo] = useState<UserInfo>({});
-//   const [inputText, setInputText] = useState('');
-//   const [isTyping, setIsTyping] = useState(false);
-
-//   const chatContainerRef = useRef<HTMLDivElement>(null);
-//   const inputRef = useRef<HTMLInputElement>(null);
-
-//   // auto-scroll
-//   useEffect(() => {
-//     if (chatContainerRef.current) {
-//       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-//     }
-//   }, [messages, isTyping]);
-
-//   // helper to add messages
-//   const pushMessage = (msg: Message) => {
-//     setMessages((p) => [...p, msg]);
-//   };
-
-//   // when user sends text
-//   const handleSubmit = async () => {
-//     const text = inputText.trim();
-//     if (!text) return;
-
-//     // add user message
-//     const userMsg: Message = {
-//       id: Date.now().toString(),
-//       text,
-//       sender: 'user',
-//       timestamp: new Date()
-//     };
-//     pushMessage(userMsg);
-//     setInputText('');
-
-//     // step handling
-//     if (step === 'greet') {
-//       setStep('ask_age');
-//       pushMessage({ id: 'ai-ask-age', text: 'Optional: What is your age? (or Skip)', sender: 'ai', timestamp: new Date() });
-//       return;
-//     }
-
-//     if (step === 'ask_age') {
-//       setUserInfo((p) => ({ ...p, age: text }));
-//       setStep('ask_gender');
-//       pushMessage({ id: 'ai-ask-gender', text: 'Optional: What is your gender? (or Skip)', sender: 'ai', timestamp: new Date() });
-//       return;
-//     }
-
-//     if (step === 'ask_gender') {
-//       setUserInfo((p) => ({ ...p, gender: text }));
-//       setStep('ask_height');
-//       pushMessage({ id: 'ai-ask-height', text: 'Optional: Height in cm? (or Skip)', sender: 'ai', timestamp: new Date() });
-//       return;
-//     }
-
-//     if (step === 'ask_height') {
-//       setUserInfo((p) => ({ ...p, height: text }));
-//       setStep('ask_weight');
-//       pushMessage({ id: 'ai-ask-weight', text: 'Optional: Weight in kg? (or Skip)', sender: 'ai', timestamp: new Date() });
-//       return;
-//     }
-
-//     if (step === 'ask_weight') {
-//       setUserInfo((p) => ({ ...p, weight: text }));
-//       setStep('ask_symptoms');
-//       pushMessage({ id: 'ai-ask-symptoms', text: 'Please describe your symptoms (required). Be as specific as possible.', sender: 'ai', timestamp: new Date() });
-//       return;
-//     }
-
-//     if (step === 'ask_symptoms') {
-//       // symptoms required
-//       const symptoms = text;
-//       await sendToBackend({ ...userInfo, symptoms });
-//       return;
-//     }
-
-//     // if at greet and user typed anything else, start flow
-//     if (step === 'greet') {
-//       setStep('ask_age');
-//     }
-//   };
-
-//   // Skip button for optional steps
-//   const handleSkip = () => {
-//     if (step === 'ask_age') {
-//       setUserInfo((p) => ({ ...p, age: null }));
-//       setStep('ask_gender');
-//       pushMessage({ id: 'ai-ask-gender', text: 'Optional: What is your gender? (or Skip)', sender: 'ai', timestamp: new Date() });
-//     } else if (step === 'ask_gender') {
-//       setUserInfo((p) => ({ ...p, gender: null }));
-//       setStep('ask_height');
-//       pushMessage({ id: 'ai-ask-height', text: 'Optional: Height in cm? (or Skip)', sender: 'ai', timestamp: new Date() });
-//     } else if (step === 'ask_height') {
-//       setUserInfo((p) => ({ ...p, height: null }));
-//       setStep('ask_weight');
-//       pushMessage({ id: 'ai-ask-weight', text: 'Optional: Weight in kg? (or Skip)', sender: 'ai', timestamp: new Date() });
-//     } else if (step === 'ask_weight') {
-//       setUserInfo((p) => ({ ...p, weight: null }));
-//       setStep('ask_symptoms');
-//       pushMessage({ id: 'ai-ask-symptoms', text: 'Please describe your symptoms (required). Be as specific as possible.', sender: 'ai', timestamp: new Date() });
-//     }
-//   };
-
-//   // send payload to Django backend which calls Gemini
-//   const sendToBackend = async (payload: { age?: string | null; gender?: string | null; height?: string | null; weight?: string | null; symptoms: string }) => {
-//     setIsTyping(true);
-//     setStep('waiting');
-
-//     // show typing indicator in chat
-//     pushMessage({ id: 'ai-typing', text: 'Analyzing your inputs — please wait a moment...', sender: 'ai', timestamp: new Date() });
-
-//     try {
-//       const res = await fetch('/api/diagnose/', {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json' },
-//         body: JSON.stringify({ userInfo: payload, symptoms: payload.symptoms })
-//       });
-//       const data = await res.json();
-
-//       // remove the temporary typing message
-//       setMessages((prev) => prev.filter((m) => m.id !== 'ai-typing'));
-
-//       if (!res.ok) {
-//         pushMessage({ id: 'ai-error', text: data.error || 'Server error', sender: 'ai', timestamp: new Date() });
-//       } else {
-//         // if backend returned parsed JSON in 'parsed', show a friendly formatted summary:
-//         if (data.parsed) {
-//           const pretty = formatParsed(data.parsed);
-//           pushMessage({ id: 'ai-result', text: pretty, sender: 'ai', timestamp: new Date() });
-//         } else {
-//           // fallback: show raw reply
-//           pushMessage({ id: 'ai-result-raw', text: data.reply || 'No reply', sender: 'ai', timestamp: new Date() });
-//         }
-//       }
-//     } catch (err: any) {
-//       setMessages((prev) => prev.filter((m) => m.id !== 'ai-typing'));
-//       pushMessage({ id: 'ai-err-fetch', text: 'Network error: ' + (err.message || err), sender: 'ai', timestamp: new Date() });
-//     } finally {
-//       setIsTyping(false);
-//       setStep('done');
-//     }
-//   };
-
-//   const formatParsed = (p: any) => {
-//     // p expected to have: summary, possible_conditions[], recommended_action, recommended_specialist, what_to_tell_doctor
-//     let out = `${p.summary || ''}\n\n`;
-//     if (p.possible_conditions && Array.isArray(p.possible_conditions)) {
-//       out += 'Possible conditions:\n';
-//       p.possible_conditions.forEach((c: any) => {
-//         out += `• ${c.name} (${c.likelihood || 'unknown'}${c.confidence ? `, ${c.confidence}%` : ''}) — ${c.reasoning || ''}\n`;
-//       });
-//       out += '\n';
-//     }
-//     out += `Recommended action: ${p.recommended_action || 'see doctor if concerned'}\n`;
-//     out += `Suggested specialist: ${p.recommended_specialist || 'General physician'}\n\n`;
-//     if (p.what_to_tell_doctor) {
-//       out += `What to tell your doctor:\n${p.what_to_tell_doctor.map((line: string) => `• ${line}\n`).join('')}\n`;
-//     }
-//     return out;
-//   };
-
-//   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-//     if (e.key === 'Enter') {
-//       e.preventDefault();
-//       handleSubmit();
-//     }
-//   };
-
-//   // initial kickoff: if user clicks into input and still at greet, ask to start
-//   useEffect(() => {
-//     if (step === 'greet') {
-//       // do nothing — initial ai greeting already present
-//     } else if (step === 'ask_age') {
-//       // focus
-//       inputRef.current?.focus();
-//     }
-//   }, [step]);
-
-//   return (
-//     <section id="chatbot" className="py-16 bg-white">
-//       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-//         <div className="bg-gray-50 rounded-2xl shadow-xl overflow-hidden">
-//           <div ref={chatContainerRef} className="h-96 overflow-y-auto p-6 space-y-4">
-//             {messages.map((message) => (
-//               <div key={message.id} className={`flex items-start space-x-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-//                 {message.sender === 'ai' && (
-//                   <div className="bg-blue-600 rounded-full p-2 flex-shrink-0">
-//                     <Bot className="h-4 w-4 text-white" />
-//                   </div>
-//                 )}
-//                 <div className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl ${message.sender === 'user' ? 'bg-[#2D9CDB] text-white rounded-br-sm' : 'bg-white text-gray-800 shadow-md rounded-bl-sm'}`}>
-//                   <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
-//                 </div>
-//                 {message.sender === 'user' && (
-//                   <div className="bg-gray-300 rounded-full p-2 flex-shrink-0">
-//                     <User className="h-4 w-4 text-gray-600" />
-//                   </div>
-//                 )}
-//               </div>
-//             ))}
-
-//             {isTyping && (
-//               <div className="flex items-start space-x-3">
-//                 <div className="bg-blue-600 rounded-full p-2 flex-shrink-0">
-//                   <Bot className="h-4 w-4 text-white" />
-//                 </div>
-//                 <div className="bg-white text-gray-800 shadow-md px-4 py-3 rounded-2xl rounded-bl-sm">
-//                   <div className="flex space-x-1">
-//                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-//                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-//                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-//                   </div>
-//                 </div>
-//               </div>
-//             )}
-//           </div>
-
-//           {/* Input */}
-//           <div className="border-t border-gray-200 p-4">
-//             <div className="flex space-x-3 items-center">
-//               <input
-//                 ref={inputRef}
-//                 type="text"
-//                 value={inputText}
-//                 onChange={(e) => setInputText(e.target.value)}
-//                 onKeyDown={handleKeyDown}
-//                 placeholder={
-//                   step === 'greet'
-//                     ? 'Type anything to begin...'
-//                     : step === 'ask_age'
-//                     ? 'Enter age (or click Skip)'
-//                     : step === 'ask_gender'
-//                     ? 'Enter gender (or Skip)'
-//                     : step === 'ask_height'
-//                     ? 'Enter height in cm (or Skip)'
-//                     : step === 'ask_weight'
-//                     ? 'Enter weight in kg (or Skip)'
-//                     : step === 'ask_symptoms'
-//                     ? 'Describe symptoms (required)'
-//                     : ''
-//                 }
-//                 className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-//                 disabled={isTyping || step === 'waiting' || step === 'done'}
-//               />
-//               <button
-//                 onClick={handleSubmit}
-//                 disabled={isTyping || step === 'waiting' || (step === 'ask_symptoms' && !inputText.trim())}
-//                 className="bg-[#2D9CDB] text-white p-3 rounded-xl hover:bg-[#56CCF2] transition-colors duration-200 disabled:opacity-60"
-//               >
-//                 {isTyping ? <Loader className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-//               </button>
-
-//               {/* Show Skip for optional steps */}
-//               {['ask_age', 'ask_gender', 'ask_height', 'ask_weight'].includes(step) && (
-//                 <button onClick={handleSkip} className="ml-2 px-3 py-2 rounded-md border border-gray-300 text-sm">
-//                   Skip
-//                 </button>
-//               )}
-//             </div>
-
-//             <div className="mt-3 text-center">
-//               <p className="text-xs text-gray-500">
-//                 This assistant gives general information only — not a medical diagnosis. For emergencies call local emergency services.
-//               </p>
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-//     </section>
-//   );
-// };
-
-// export default Chatbot;
-
-
-// // The server route is /api/diagnose/ (Django). Edit the path if you use a different route.
-
-// // Optional fields are stored as null if skipped. Symptoms are required.
-
-// // The component attempts to parse structured JSON returned in data.parsed — your backend will try to parse model output to JSON (see backend).

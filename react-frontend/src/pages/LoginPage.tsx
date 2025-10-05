@@ -17,17 +17,53 @@ const LoginPage = () => {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
 
-  // REGISTER CHECKBOX STATES
-  const [termsChecked, setTermsChecked] = useState(false);
+  // LOCATION STATES
   const [locationChecked, setLocationChecked] = useState(false);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [address, setAddress] = useState<string>("");
 
-  // Toggle between login and register
+  // OTHER STATES
+  const [termsChecked, setTermsChecked] = useState(false);
   const [isActive, setIsActive] = useState(false);
 
-  // LOGIN with Supabase
+  // Replace with your LocationIQ API key
+  const LOCATIONIQ_API_KEY = import.meta.env.VITE_LOCATIONIQ_API_KEY;
+
+  // 📍 Handle location permission and fetch location
+ const handleLocationAccess = async (checked: boolean) => {
+  setLocationChecked(checked);
+  if (checked && "geolocation" in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        setLatitude(lat);
+        setLongitude(lon);
+
+        try {
+          const res = await fetch(
+            `https://us1.locationiq.com/v1/reverse.php?key=${LOCATIONIQ_API_KEY}&lat=${lat}&lon=${lon}&format=json`
+          );
+          const data = await res.json();
+          setAddress(data.display_name || "");
+        } catch (err) {
+          console.error("Error fetching address:", err);
+        }
+      },
+      (error) => {
+        console.error("Location access denied:", error);
+        alert("Please allow location access to continue.");
+        setLocationChecked(false); // reset if denied
+      }
+    );
+  }
+};
+
+
+  // LOGIN
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
     const email = loginEmail.trim();
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -40,15 +76,12 @@ const LoginPage = () => {
     } else if (data.user?.email_confirmed_at === null) {
       alert("Please confirm your email before logging in.");
     } else {
-      // ✅ Set logged in for ProtectedRoute
       localStorage.setItem("isLoggedIn", "true");
-
-      // ✅ Redirect to /index
       navigate("/index", { replace: true });
     }
   };
 
-  // REGISTER with Supabase
+  // REGISTER
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -56,42 +89,58 @@ const LoginPage = () => {
       alert("You must accept the Terms and allow location to register.");
       return;
     }
+    if (latitude === null || longitude === null) {
+  alert("Fetching location... Please wait a moment and try again.");
+  return;
+}
+
 
     const email = regEmail.trim();
-
-    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
-    if (!emailPattern.test(email)) {
-      alert("Please enter a valid email in format: name.name@gmail.com");
-      return;
-    }
-
     const { data, error } = await supabase.auth.signUp({
       email,
       password: regPassword,
-      options: {
-        data: {
-          name: regName,
-          phone: regPhone,
-          termsAccepted: termsChecked,
-          locationAllowed: locationChecked,
-        },
-      },
     });
 
     if (error) {
       alert("Registration failed: " + error.message);
+      return;
+    }
+
+    const user = data.user;
+    if (!user) {
+      alert("User not found after registration.");
+      return;
+    }
+
+    // Step 2: Insert user details including location
+const { error: insertError } = await supabase.from("patients").insert([
+  {
+    auth_id: user.id,
+    full_name: regName,
+    email,
+    phone: regPhone,
+    address,
+    latitude: latitude ?? 0,   // fallback to 0 if null
+    longitude: longitude ?? 0, // fallback to 0 if null
+    location_allowed: true,
+    terms_accepted: true,
+  },
+]);
+
+
+    if (insertError) {
+      console.error("Error saving patient details:", insertError.message);
     } else {
       alert("Registration successful! Please check your email for confirmation.");
-      setIsActive(false);
-
-      // Clear form
-      setRegName("");
-      setRegPhone("");
-      setRegEmail("");
-      setRegPassword("");
-      setTermsChecked(false);
-      setLocationChecked(false);
     }
+
+    setIsActive(false);
+    setRegName("");
+    setRegPhone("");
+    setRegEmail("");
+    setRegPassword("");
+    setTermsChecked(false);
+    setLocationChecked(false);
   };
 
 
@@ -377,12 +426,12 @@ const LoginPage = () => {
             <h1 style={h1Styles}>Login</h1>
             <div style={inputBoxStyles}>
               <input type="email" placeholder="Email" required style={inputStyles} value={loginEmail}
-  onChange={(e) => setLoginEmail(e.target.value)}/>
+                onChange={(e) => setLoginEmail(e.target.value)} />
               <i className="bx bxs-user" style={iconStyles}></i>
             </div>
             <div style={inputBoxStyles}>
               <input type="password" placeholder="Password" required style={inputStyles} value={loginPassword}
-  onChange={(e) => setLoginPassword(e.target.value)}/>
+                onChange={(e) => setLoginPassword(e.target.value)} />
               <i className="bx bxs-lock-alt" style={iconStyles}></i>
             </div>
             <div style={forgotLinkStyles}>
@@ -406,31 +455,46 @@ const LoginPage = () => {
           <form style={formStyles} onSubmit={handleRegister}>
             <h1 style={h1Styles}>Register</h1>
             <div style={inputBoxStyles}>
-              <input type="text" placeholder="Name" required style={inputStyles} value={regName} onChange={(e) => setRegName(e.target.value)}/>
+              <input type="text" placeholder="Name" required style={inputStyles} value={regName} onChange={(e) => setRegName(e.target.value)} />
               <i className="bx bxs-user" style={iconStyles}></i>
             </div>
             <div style={inputBoxStyles}>
-              <input type="tel" placeholder="Phone" required style={inputStyles} value={regPhone} onChange={(e) => setRegPhone(e.target.value)}/>
+              <input type="tel" placeholder="Phone" required style={inputStyles} value={regPhone} onChange={(e) => setRegPhone(e.target.value)} />
               <i className="bx bxs-phone" style={iconStyles}></i>
             </div>
             <div style={inputBoxStyles}>
-              <input type="email" placeholder="Email" required style={inputStyles} value={regEmail} onChange={(e) => setRegEmail(e.target.value)}/>
+              <input type="email" placeholder="Email" required style={inputStyles} value={regEmail} onChange={(e) => setRegEmail(e.target.value)} />
               <i className="bx bxs-envelope" style={iconStyles}></i>
             </div>
             <div style={inputBoxStyles}>
-              <input type="password" placeholder="Create Password" required style={inputStyles} value={regPassword} onChange={(e) => setRegPassword(e.target.value)}/>
+              <input type="password" placeholder="Create Password" required style={inputStyles} value={regPassword} onChange={(e) => setRegPassword(e.target.value)} />
               <i className="bx bxs-lock-alt" style={iconStyles}></i>
             </div>
             <div style={checkboxStyles}>
               <input type="checkbox" id="terms" required style={checkboxInputStyles} checked={termsChecked}
-    onChange={(e) => setTermsChecked(e.target.checked)}/>
+                onChange={(e) => setTermsChecked(e.target.checked)} />
               <label htmlFor="terms" style={checkboxLabelStyles}>I agree to the <a href="#" style={linkStyles}>Terms of Service</a> and <a href="#" style={linkStyles}>Privacy Policy</a>.</label>
             </div>
             <div style={checkboxStyles}>
+  <input
+    type="checkbox"
+    id="location"
+    required
+    style={checkboxInputStyles}
+    checked={locationChecked}
+    onChange={(e) => handleLocationAccess(e.target.checked)}
+  />
+  <label htmlFor="location" style={checkboxLabelStyles}>
+    I allow this app to access my location for health insights.
+  </label>
+</div>
+
+
+            {/* <div style={checkboxStyles}>
               <input type="checkbox" id="location" required style={checkboxInputStyles} checked={locationChecked}
-    onChange={(e) => setLocationChecked(e.target.checked)}/>
+                onChange={(e) => setLocationChecked(e.target.checked)} />
               <label htmlFor="location" style={checkboxLabelStyles}>I allow this app to access my location for health insights.</label>
-            </div>
+            </div> */}
             <button type="submit" style={btnStyles}>
               Register
             </button>

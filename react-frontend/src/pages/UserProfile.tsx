@@ -1,32 +1,30 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
-  User, 
-  Calendar, 
-  Settings, 
-  Bell, 
-  Heart, 
-  Clock, 
-  MapPin, 
-  Phone, 
+import { useEffect, useState } from "react";
+import { supabase } from "../supabaseClient";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  User,
+  Calendar,
+  Bell,
   Mail,
+  Phone,
   Edit3,
   Plus,
   Stethoscope,
-  ArrowRight
-} from 'lucide-react';
+  ArrowRight,
+  Clock,
+  MapPin,
+  Save,
+  X
+} from "lucide-react";
 
-const UserProfile = () => {
-  const [activeTab, setActiveTab] = useState('appointments');
-  const [userInfo, setUserInfo] = useState({
-    name: 'John Doe',
-    email: 'john.doe@email.com',
-    phone: '+1 (555) 123-4567',
-    dateOfBirth: '1990-05-15',
-    address: '123 Main St, New York, NY 10001',
-    emergencyContact: 'Jane Doe - +1 (555) 987-6543'
-  });
+export default function UserProfile() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState('profile');
+  const navigate = useNavigate();
 
   const appointments = [
     {
@@ -48,24 +46,165 @@ const UserProfile = () => {
       status: 'completed',
       type: 'Follow-up',
       location: 'UCLA Medical Center'
-    },
-    {
-      id: 3,
-      doctor: 'Dr. Emily Rodriguez',
-      specialty: 'Pediatrician',
-      date: '2024-01-08',
-      time: '11:15 AM',
-      status: 'completed',
-      type: 'Check-up',
-      location: 'Children\'s Hospital'
     }
   ];
 
   const tabs = [
-    { id: 'appointments', label: 'My Appointments', icon: Calendar },
     { id: 'profile', label: 'Profile Settings', icon: User },
+    { id: 'appointments', label: 'My Appointments', icon: Calendar },
     { id: 'notifications', label: 'Notifications', icon: Bell }
   ];
+
+  // Fetch logged-in user and their profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoading(true);
+
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      if (!authUser) {
+        navigate("/login");
+        return;
+      }
+
+      console.log("🔍 Fetching profile for auth_id:", authUser.id);
+
+      const { data, error } = await supabase
+        .from("patients")
+        .select("*")
+        .eq("auth_id", authUser.id)
+        .maybeSingle();
+
+      console.log("📦 Database Response:", { data, error });
+
+      if (error) {
+        console.error("❌ Error fetching profile:", error);
+        alert("Error loading profile. Please try again.");
+      } else if (!data) {
+        console.warn("⚠️ No profile found for this user yet.");
+        setUser({
+          auth_id: authUser.id,
+          email: authUser.email,
+          full_name: "",
+          phone: "",
+          address: "",
+          weight: "",
+          height: "",
+          blood_group: "",
+          age: "",
+          gender: "",
+          profile_photo: null,
+        });
+      } else {
+        console.log("✅ Profile Data Fetched Successfully:");
+        console.log("📝 Name:", data.full_name || "Not Provided");
+        console.log("📞 Phone:", data.phone || "Not Provided");
+        console.log("📍 Address:", data.address || "Not Provided");
+        console.log("📊 Full Profile Data:", data);
+        setUser({ ...data, email: authUser.email });
+      }
+
+      setLoading(false);
+    };
+
+    fetchProfile();
+  }, [navigate]);
+
+  // Handle avatar upload
+  const handleFileChange = async (event: any) => {
+    try {
+      setUploading(true);
+
+      const file = event.target.files?.[0];
+      if (!file) throw new Error("You must select an image to upload.");
+
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Please select a valid image file.");
+      }
+
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user.id || user.auth_id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("profilephoto")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("profilephoto").getPublicUrl(filePath, {
+        download: false,
+      });
+
+      const urlWithTimestamp = `${publicUrl}?t=${Date.now()}`;
+
+      const { error: updateError } = await supabase
+        .from("patients")
+        .update({ profile_photo: publicUrl })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      setUser({ ...user, profile_photo: urlWithTimestamp });
+      alert("✅ Profile photo updated successfully!");
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      alert(`Error uploading image: ${error.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Update user profile
+  const handleSave = async (e: any) => {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      const updates = {
+        full_name: user.full_name || null,
+        phone: user.phone || null,
+        address: user.address || null,
+        weight: user.weight ? parseFloat(user.weight) : null,
+        height: user.height ? parseFloat(user.height) : null,
+        blood_group: user.blood_group || null,
+        age: user.age ? parseInt(user.age) : null,
+        gender: user.gender || null,
+        latitude: user.latitude ? parseFloat(user.latitude) : null,
+        longitude: user.longitude ? parseFloat(user.longitude) : null,
+      };
+
+      if (!user.id) {
+        const { data, error } = await supabase
+          .from("patients")
+          .insert([{ ...updates, auth_id: user.auth_id }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setUser({ ...data, email: user.email });
+        alert("✅ Profile created successfully!");
+      } else {
+        const { error } = await supabase
+          .from("patients")
+          .update(updates)
+          .eq("id", user.id);
+
+        if (error) throw error;
+        alert("✅ Profile updated successfully!");
+      }
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error("Update error:", error);
+      alert(`❌ Error saving profile: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -80,67 +219,73 @@ const UserProfile = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen w-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-screen w-screen bg-gray-50">
+        <div className="text-center">
+          <p className="text-red-500 text-lg mb-4">No user found. Please log in.</p>
+          <button
+            onClick={() => navigate("/login")}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-lg p-8 mb-8"
-        >
+        <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
           <div className="flex flex-col lg:flex-row items-center lg:items-start space-y-6 lg:space-y-0 lg:space-x-8">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="relative"
-            >
-              <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-green-500 rounded-full flex items-center justify-center">
+            <div className="relative">
+              <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-green-500 rounded-full flex items-center justify-center border-4 border-blue-500 shadow-md">
                 <User className="w-12 h-12 text-white" />
               </div>
-              <button className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-shadow">
-                <Edit3 className="w-4 h-4 text-gray-600" />
-              </button>
-            </motion.div>
+            </div>
             
             <div className="text-center lg:text-left flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{userInfo.name}</h1>
-              <p className="text-gray-600 mb-4">Patient ID: #PAT001234</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                {user.full_name || "Complete Your Profile"}
+              </h1>
               <div className="flex flex-wrap justify-center lg:justify-start gap-4 mb-6">
                 <div className="flex items-center text-gray-600">
                   <Mail className="w-4 h-4 mr-2" />
-                  {userInfo.email}
+                  {user.email}
                 </div>
-                <div className="flex items-center text-gray-600">
-                  <Phone className="w-4 h-4 mr-2" />
-                  {userInfo.phone}
-                </div>
+                
+                
               </div>
               
-              {/* Register as Doctor Button */}
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              <Link
+                to="/doctor_registration"
+                className="inline-flex items-center bg-gradient-to-r from-green-500 to-blue-500 text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg transition-all duration-300 group"
               >
-                <Link
-                  to="/doctor_registration"
-                  className="inline-flex items-center bg-gradient-to-r from-green-500 to-blue-500 text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg transition-all duration-300 group"
-                >
-                  <Stethoscope className="w-5 h-5 mr-2" />
-                  Register Yourself as a Doctor
-                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </motion.div>
+                <Stethoscope className="w-5 h-5 mr-2" />
+                Register Yourself as a Doctor
+                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Sidebar */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="lg:col-span-1"
-          >
+          <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <nav className="space-y-2">
                 {tabs.map((tab) => {
@@ -162,17 +307,182 @@ const UserProfile = () => {
                 })}
               </nav>
             </div>
-          </motion.div>
+          </div>
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className="bg-white rounded-2xl shadow-lg p-8"
-            >
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              {activeTab === 'profile' && (
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+                      <User className="w-6 h-6 mr-3 text-blue-500" />
+                      Profile Settings
+                    </h2>
+                    {!isEditing ? (
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center"
+                      >
+                        <Edit3 className="w-4 h-4 mr-2" />
+                        Edit Profile
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setIsEditing(false)}
+                        className="bg-gray-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-600 transition-colors flex items-center"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleSave} className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={user.full_name || ""}
+                        onChange={(e) => setUser({ ...user, full_name: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        required
+                        disabled={!isEditing}
+                        placeholder="Enter your full name"
+                      />
+                      
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        value={user.phone || ""}
+                        onChange={(e) => setUser({ ...user, phone: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                        placeholder="Enter your phone number"
+                      />
+                      
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Address
+                      </label>
+                      <input
+                        type="text"
+                        value={user.address || ""}
+                        onChange={(e) => setUser({ ...user, address: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                        placeholder="Enter your address"
+                      />
+                     
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Weight (kg)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={user.weight || ""}
+                        onChange={(e) => setUser({ ...user, weight: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Height (cm)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={user.height || ""}
+                        onChange={(e) => setUser({ ...user, height: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Blood Group
+                      </label>
+                      <select
+                        value={user.blood_group || ""}
+                        onChange={(e) => setUser({ ...user, blood_group: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      >
+                        <option value="">Select Blood Group</option>
+                        <option>A+</option>
+                        <option>A-</option>
+                        <option>B+</option>
+                        <option>B-</option>
+                        <option>AB+</option>
+                        <option>AB-</option>
+                        <option>O+</option>
+                        <option>O-</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Age
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="150"
+                        value={user.age || ""}
+                        onChange={(e) => setUser({ ...user, age: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Gender
+                      </label>
+                      <select
+                        value={user.gender || ""}
+                        onChange={(e) => setUser({ ...user, gender: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={!isEditing}
+                      >
+                        <option value="">Select Gender</option>
+                        <option>Male</option>
+                        <option>Female</option>
+                        <option>Other</option>
+                      </select>
+                    </div>
+
+                    {isEditing && (
+                      <div className="md:col-span-2">
+                        <button
+                          type="submit"
+                          disabled={saving}
+                          className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center"
+                        >
+                          <Save className="w-5 h-5 mr-2" />
+                          {saving ? "Saving..." : "Save Changes"}
+                        </button>
+                      </div>
+                    )}
+                  </form>
+                </div>
+              )}
+
               {activeTab === 'appointments' && (
                 <div>
                   <div className="flex items-center justify-between mb-6">
@@ -191,11 +501,8 @@ const UserProfile = () => {
 
                   <div className="space-y-4">
                     {appointments.map((appointment) => (
-                      <motion.div
+                      <div
                         key={appointment.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        whileHover={{ y: -2 }}
                         className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300"
                       >
                         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
@@ -242,97 +549,8 @@ const UserProfile = () => {
                             )}
                           </div>
                         </div>
-                      </motion.div>
+                      </div>
                     ))}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'profile' && (
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                    <User className="w-6 h-6 mr-3 text-blue-500" />
-                    Profile Settings
-                  </h2>
-                  
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Full Name
-                      </label>
-                      <input
-                        type="text"
-                        value={userInfo.name}
-                        onChange={(e) => setUserInfo({...userInfo, name: e.target.value})}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        value={userInfo.email}
-                        onChange={(e) => setUserInfo({...userInfo, email: e.target.value})}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        value={userInfo.phone}
-                        onChange={(e) => setUserInfo({...userInfo, phone: e.target.value})}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Date of Birth
-                      </label>
-                      <input
-                        type="date"
-                        value={userInfo.dateOfBirth}
-                        onChange={(e) => setUserInfo({...userInfo, dateOfBirth: e.target.value})}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Address
-                      </label>
-                      <input
-                        type="text"
-                        value={userInfo.address}
-                        onChange={(e) => setUserInfo({...userInfo, address: e.target.value})}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Emergency Contact
-                      </label>
-                      <input
-                        type="text"
-                        value={userInfo.emergencyContact}
-                        onChange={(e) => setUserInfo({...userInfo, emergencyContact: e.target.value})}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="mt-8">
-                    <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                      Save Changes
-                    </button>
                   </div>
                 </div>
               )}
@@ -380,12 +598,10 @@ const UserProfile = () => {
                   </div>
                 </div>
               )}
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
-};
-
-export default UserProfile;
+}
