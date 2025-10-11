@@ -27,6 +27,7 @@ type UserInfo = {
 
 const Chatbot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const messageIdRef = useRef(1);
   const [patientDataFetched, setPatientDataFetched] = useState(false);
   const [dataConfirmed, setDataConfirmed] = useState(false);
   const [updatingField, setUpdatingField] = useState<string | null>(null);
@@ -71,7 +72,7 @@ const Chatbot: React.FC = () => {
 
           // Initial greeting with patient data
           setMessages([{
-            id: "1",
+            id: getMessageId(),
             text: `Hello ${patientData.full_name}! I have your health information. Let me confirm if these details are correct:\n\n` +
                   `Age: ${patientData.age || 'Not provided'}\n` +
                   `Gender: ${patientData.gender || 'Not provided'}\n` +
@@ -88,7 +89,7 @@ const Chatbot: React.FC = () => {
         console.error('Error fetching patient data:', error);
         // Fall back to default greeting if fetch fails
         setMessages([{
-          id: "1",
+          id: getMessageId(),
           text: "Hello! Welcome to your AI health assistant. I'm here to help analyze your symptoms and provide guidance. To get started, please say 'Hi' or 'Hello'.",
           sender: "ai",
           timestamp: new Date(),
@@ -116,13 +117,17 @@ const Chatbot: React.FC = () => {
   }, [messages, isTyping]);
 
   const pushMessage = (msg: Message) => setMessages((p) => [...p, msg]);
+  // Generate unique message ID
+  const getMessageId = () => {
+    return (messageIdRef.current++).toString();
+  };
 
   const handleNext = async (value: string) => {
     const userResponse = value.toLowerCase().trim();
     
-    // Add user message to chat
+    // Add user message to chat (only once per input)
     pushMessage({
-      id: Date.now().toString(),
+      id: getMessageId(),
       text: value,
       sender: "user",
       timestamp: new Date(),
@@ -339,13 +344,7 @@ const Chatbot: React.FC = () => {
       }
     }
 
-    // Add user message
-    pushMessage({
-      id: Date.now().toString(),
-      text: val,
-      sender: "user",
-      timestamp: new Date(),
-    });
+    // Don't push user message again here (already pushed above)
 
     // Move to next step
     if (step < steps.length - 1) {
@@ -420,72 +419,34 @@ const Chatbot: React.FC = () => {
 
       // format result
       let formattedText = "";
-
       if (parsedResult.possible_diseases) {
         formattedText += "🧾 **Based on your symptoms, location, and the current season, here's my analysis:**\n\n";
         formattedText += `• **Possible Conditions:** ${parsedResult.possible_diseases.join(", ")}\n\n`;
-        
+        if (parsedResult.recommended_specialty) {
+          formattedText += `🔎 **Recommended Specialist:** ${parsedResult.recommended_specialty}\n\n`;
+        }
         if (parsedResult.seasonal_analysis) {
           formattedText += `🌡️ **Seasonal Context:**\n${parsedResult.seasonal_analysis}\n\n`;
         }
-        
         formattedText += `💡 **Advice:** ${parsedResult.advice || "No specific advice available"}\n\n`;
-        
-        // Fetch doctors based on recommended specialty
-        if (parsedResult.recommended_specialty) {
-          try {
-            const { data: doctors, error } = await supabase
-              .from('doctors')
-              .select(`
-                *,
-                doctor_specialties!inner(
-                  specialties!inner(name)
-                )
-              `)
-              .eq('doctor_specialties.specialties.name', parsedResult.recommended_specialty)
-              .order('experience', { ascending: false })
-              .limit(3);
-
-            if (!error && doctors?.length > 0) {
-              formattedText += "\n👨‍⚕️ **Recommended Doctors:**\n";
-              doctors.forEach((doctor: any) => {
-                formattedText += `\n• Dr. ${doctor.full_name}\n`;
-                formattedText += `  Experience: ${doctor.experience} years\n`;
-                formattedText += `  Clinic: ${doctor.clinic_name}\n`;
-                formattedText += `  Fee: ₹${doctor.consultation_fee}\n`;
-                formattedText += `  📞 ${doctor.phone}\n`;
-              });
-            }
-          } catch (err) {
-            console.error('Error fetching doctors:', err);
-          }
-        }
-
-        formattedText += `\n💡 **Additional Notes:** ${parsedResult.additional_notes || "No additional notes"}\n`;
-      } else if (parsedResult.message) {
-        formattedText = parsedResult.message;
-      } else {
-        formattedText = typeof parsedResult === 'string' ? parsedResult : "⚠️ Unexpected response format.";
-      }
-
-      // Send analysis result
-      pushMessage({
-        id: "ai-result",
-        text: formattedText,
-        sender: "ai",
-        timestamp: new Date(),
-      });
-
-      // Ask about doctor suggestions
-      setTimeout(() => {
+        // Send analysis result
         pushMessage({
-          id: "ai-doctor-prompt",
-          text: "Would you like me to suggest some doctors nearby who specialize in treating these conditions? (yes/no)",
+          id: "ai-result",
+          text: formattedText,
           sender: "ai",
           timestamp: new Date(),
         });
-        setStep("doctor_suggestion");
-      }, 1000);
+        // Ask about doctor suggestions
+        setTimeout(() => {
+          pushMessage({
+            id: "ai-doctor-prompt",
+            text: "Would you like me to suggest some doctors nearby who specialize in treating these conditions? (yes/no)",
+            sender: "ai",
+            timestamp: new Date(),
+          });
+          setStep("doctor_suggestion");
+        }, 1000);
+      }
 
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
