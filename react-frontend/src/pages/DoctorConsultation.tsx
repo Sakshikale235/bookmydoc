@@ -1,19 +1,39 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Heart, Users, MapPin, Phone } from 'lucide-react';
 import { DoctorCardHorizontal } from '@/components/ui/DoctorCardHorizontal';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { SearchBarHorizontal } from '@/components/ui/SearchBarHorizontal';
-import { doctorsData } from '@/data/doctors';
+import { supabase } from "../lib/supabaseClient";
 import { Doctor } from '@/types/doctor';
 import gsap from 'gsap';
 
-const DoctorConsultation: React.FC = () =>  {
+const DoctorConsultation: React.FC = () => {
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSpecialization, setSelectedSpecialization] = useState('');
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState('');
 
   const cardsRef = useRef<HTMLDivElement | null>(null);
+
+  // Fetch doctors from Supabase
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('doctors')
+        .select('*');
+      if (error) {
+        console.error('Error fetching doctors:', error.message);
+      } else {
+        setDoctors(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchDoctors();
+  }, []);
 
   // Animate doctor cards when they load or filter changes
   useEffect(() => {
@@ -27,50 +47,43 @@ const DoctorConsultation: React.FC = () =>  {
         ease: "power3.out",
       });
     }
-  }, [searchTerm, selectedSpecialization]);
+  }, [doctors, searchTerm, selectedSpecialization]);
 
-  // Get unique specializations for filter
+  // Get unique specializations for filter dynamically
   const specializations = useMemo(() => {
-    return Array.from(new Set(doctorsData.map(doctor => doctor.specialization))).sort();
-  }, []);
+    return Array.from(new Set(doctors.map(doctor => doctor.specialization))).sort();
+  }, [doctors]);
 
   // Filter doctors based on search criteria
   const filteredDoctors = useMemo(() => {
-    return doctorsData.filter(doctor => {
-      const matchesSearch = searchTerm === '' || 
-        doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.hospital.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesSpecialization = selectedSpecialization === '' || 
+    return doctors.filter(doctor => {
+      const matchesSearch = searchTerm === '' ||
+        doctor.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doctor.specialization?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doctor.clinic_name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesSpecialization = selectedSpecialization === '' ||
         doctor.specialization === selectedSpecialization;
-      
-      return matchesSearch && matchesSpecialization;
+
+      const matchesLocation = location === '' ||
+        doctor.location?.toLowerCase().includes(location.toLowerCase());
+
+      return matchesSearch && matchesSpecialization && matchesLocation;
     });
-  }, [searchTerm, selectedSpecialization]);
+  }, [doctors, searchTerm, selectedSpecialization, location]);
 
   const handleBookAppointment = (doctor: Doctor) => {
-    alert(`Booking appointment with ${doctor.name}. This would typically open a booking modal or redirect to a booking page.`);
+    alert(`Booking appointment with ${doctor.full_name}.`);
   };
 
   const handleViewProfile = (doctor: Doctor) => {
-    alert(`Viewing profile for ${doctor.name}. This would typically show detailed doctor information.`);
-  };
-
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-  };
-
-  const handleSpecializationChange = (value: string) => {
-    setSelectedSpecialization(value);
+    alert(`Viewing profile for ${doctor.full_name}.`);
   };
 
   return (
-    
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
-        <Navigation />
+      <Navigation />
 
-      {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
@@ -83,12 +96,10 @@ const DoctorConsultation: React.FC = () =>  {
                 <p className="text-gray-600 text-sm sm:text-base">Discover trusted healthcare professionals near you</p>
               </div>
             </div>
-            
-            {/* Stats */}
             <div className="hidden sm:flex items-center space-x-6 text-sm text-gray-600">
               <div className="flex items-center space-x-1">
                 <Users className="h-4 w-4 text-blue-600" />
-                <span>{doctorsData.length}+ Doctors</span>
+                <span>{doctors.length}+ Doctors</span>
               </div>
               <div className="flex items-center space-x-1">
                 <MapPin className="h-4 w-4 text-green-600" />
@@ -103,26 +114,23 @@ const DoctorConsultation: React.FC = () =>  {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search Section */}
         <div className="mb-8">
           <SearchBarHorizontal
             searchTerm={searchTerm}
-            onSearchChange={handleSearchChange}
+            onSearchChange={setSearchTerm}
             selectedSpecialization={selectedSpecialization}
-            onSpecializationChange={handleSpecializationChange}
+            onSpecializationChange={setSelectedSpecialization}
             specializations={specializations}
-              location={location}
-  onLocationChange={setLocation}
+            location={location}
+            onLocationChange={setLocation}
           />
         </div>
 
-        {/* Results Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-2 sm:mb-0">
-            {filteredDoctors.length === 0 ? 'No doctors found' : 
-             filteredDoctors.length === 1 ? '1 Doctor Available' : 
+            {filteredDoctors.length === 0 ? 'No doctors found' :
+             filteredDoctors.length === 1 ? '1 Doctor Available' :
              `${filteredDoctors.length} Doctors Available`}
           </h2>
           {(searchTerm || selectedSpecialization) && (
@@ -141,10 +149,11 @@ const DoctorConsultation: React.FC = () =>  {
           )}
         </div>
 
-        {/* Doctor Cards */}
-        {filteredDoctors.length > 0 ? (
+        {loading ? (
+          <div className="text-center py-12">Loading doctors...</div>
+        ) : filteredDoctors.length > 0 ? (
           <div className="space-y-6" ref={cardsRef}>
-            {filteredDoctors.map((doctor) => (
+            {filteredDoctors.map(doctor => (
               <div key={doctor.id} className="doctor-card">
                 <DoctorCardHorizontal
                   doctor={doctor}
@@ -167,6 +176,7 @@ const DoctorConsultation: React.FC = () =>  {
               onClick={() => {
                 setSearchTerm('');
                 setSelectedSpecialization('');
+                setLocation('');
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
             >
@@ -177,9 +187,196 @@ const DoctorConsultation: React.FC = () =>  {
       </main>
 
       <Footer/>
-
     </div>
   );
-}
+};
 
 export default DoctorConsultation;
+
+
+
+// import React, { useState, useMemo, useRef, useEffect } from 'react';
+// import { Heart, Users, MapPin, Phone } from 'lucide-react';
+// import { DoctorCardHorizontal } from '@/components/ui/DoctorCardHorizontal';
+// import Navigation from '@/components/Navigation';
+// import Footer from '@/components/Footer';
+// import { SearchBarHorizontal } from '@/components/ui/SearchBarHorizontal';
+// import { doctorsData } from '@/data/doctors';
+// import { Doctor } from '@/types/doctor';
+// import gsap from 'gsap';
+
+// const DoctorConsultation: React.FC = () =>  {
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [selectedSpecialization, setSelectedSpecialization] = useState('');
+//   const [location, setLocation] = useState("");
+
+//   const cardsRef = useRef<HTMLDivElement | null>(null);
+
+//   // Animate doctor cards when they load or filter changes
+//   useEffect(() => {
+//     if (cardsRef.current) {
+//       const cards = gsap.utils.toArray(cardsRef.current.querySelectorAll('.doctor-card'));
+//       gsap.from(cards, {
+//         y: 40,
+//         opacity: 0,
+//         stagger: 0.2,
+//         duration: 0.8,
+//         ease: "power3.out",
+//       });
+//     }
+//   }, [searchTerm, selectedSpecialization]);
+
+//   // Get unique specializations for filter
+//   const specializations = useMemo(() => {
+//     return Array.from(new Set(doctorsData.map(doctor => doctor.specialization))).sort();
+//   }, []);
+
+//   // Filter doctors based on search criteria
+//   const filteredDoctors = useMemo(() => {
+//     return doctorsData.filter(doctor => {
+//       const matchesSearch = searchTerm === '' || 
+//         doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+//         doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase()) ||
+//         doctor.hospital.toLowerCase().includes(searchTerm.toLowerCase());
+      
+//       const matchesSpecialization = selectedSpecialization === '' || 
+//         doctor.specialization === selectedSpecialization;
+      
+//       return matchesSearch && matchesSpecialization;
+//     });
+//   }, [searchTerm, selectedSpecialization]);
+
+//   const handleBookAppointment = (doctor: Doctor) => {
+//     alert(`Booking appointment with ${doctor.name}. This would typically open a booking modal or redirect to a booking page.`);
+//   };
+
+//   const handleViewProfile = (doctor: Doctor) => {
+//     alert(`Viewing profile for ${doctor.name}. This would typically show detailed doctor information.`);
+//   };
+
+//   const handleSearchChange = (value: string) => {
+//     setSearchTerm(value);
+//   };
+
+//   const handleSpecializationChange = (value: string) => {
+//     setSelectedSpecialization(value);
+//   };
+
+//   return (
+    
+//     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
+//         <Navigation />
+
+//       {/* Header */}
+//       <header className="bg-white shadow-sm border-b border-gray-100">
+//         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+//           <div className="flex items-center justify-between">
+//             <div className="flex items-center space-x-3">
+//               <div className="bg-blue-600 p-2 rounded-lg">
+//                 <Heart className="h-8 w-8 text-white" />
+//               </div>
+//               <div>
+//                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Find Your Doctor</h1>
+//                 <p className="text-gray-600 text-sm sm:text-base">Discover trusted healthcare professionals near you</p>
+//               </div>
+//             </div>
+            
+//             {/* Stats */}
+//             <div className="hidden sm:flex items-center space-x-6 text-sm text-gray-600">
+//               <div className="flex items-center space-x-1">
+//                 <Users className="h-4 w-4 text-blue-600" />
+//                 <span>{doctorsData.length}+ Doctors</span>
+//               </div>
+//               <div className="flex items-center space-x-1">
+//                 <MapPin className="h-4 w-4 text-green-600" />
+//                 <span>Multiple Locations</span>
+//               </div>
+//               <div className="flex items-center space-x-1">
+//                 <Phone className="h-4 w-4 text-purple-600" />
+//                 <span>24/7 Support</span>
+//               </div>
+//             </div>
+//           </div>
+//         </div>
+//       </header>
+
+//       {/* Main Content */}
+//       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+//         {/* Search Section */}
+//         <div className="mb-8">
+//           <SearchBarHorizontal
+//             searchTerm={searchTerm}
+//             onSearchChange={handleSearchChange}
+//             selectedSpecialization={selectedSpecialization}
+//             onSpecializationChange={handleSpecializationChange}
+//             specializations={specializations}
+//               location={location}
+//   onLocationChange={setLocation}
+//           />
+//         </div>
+
+//         {/* Results Header */}
+//         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+//           <h2 className="text-xl font-semibold text-gray-900 mb-2 sm:mb-0">
+//             {filteredDoctors.length === 0 ? 'No doctors found' : 
+//              filteredDoctors.length === 1 ? '1 Doctor Available' : 
+//              `${filteredDoctors.length} Doctors Available`}
+//           </h2>
+//           {(searchTerm || selectedSpecialization) && (
+//             <div className="flex items-center space-x-2 text-sm text-gray-600">
+//               {searchTerm && (
+//                 <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md">
+//                   Search: "{searchTerm}"
+//                 </span>
+//               )}
+//               {selectedSpecialization && (
+//                 <span className="bg-green-100 text-green-800 px-2 py-1 rounded-md">
+//                   {selectedSpecialization}
+//                 </span>
+//               )}
+//             </div>
+//           )}
+//         </div>
+
+//         {/* Doctor Cards */}
+//         {filteredDoctors.length > 0 ? (
+//           <div className="space-y-6" ref={cardsRef}>
+//             {filteredDoctors.map((doctor) => (
+//               <div key={doctor.id} className="doctor-card">
+//                 <DoctorCardHorizontal
+//                   doctor={doctor}
+//                   onBookAppointment={handleBookAppointment}
+//                   onViewProfile={handleViewProfile}
+//                 />
+//               </div>
+//             ))}
+//           </div>
+//         ) : (
+//           <div className="text-center py-12">
+//             <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+//               <Users className="h-8 w-8 text-gray-400" />
+//             </div>
+//             <h3 className="text-lg font-medium text-gray-900 mb-2">No doctors found</h3>
+//             <p className="text-gray-600 mb-4">
+//               Try adjusting your search criteria or browse all available doctors.
+//             </p>
+//             <button
+//               onClick={() => {
+//                 setSearchTerm('');
+//                 setSelectedSpecialization('');
+//               }}
+//               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
+//             >
+//               Clear Filters
+//             </button>
+//           </div>
+//         )}
+//       </main>
+
+//       <Footer/>
+
+//     </div>
+//   );
+// }
+
+// export default DoctorConsultation;

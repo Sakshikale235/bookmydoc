@@ -26,28 +26,24 @@ export default function UserProfile() {
   const [activeTab, setActiveTab] = useState('profile');
   const navigate = useNavigate();
 
-  const appointments = [
-    {
-      id: 1,
-      doctor: 'Dr. Sarah Johnson',
-      specialty: 'Cardiologist',
-      date: '2024-01-15',
-      time: '10:00 AM',
-      status: 'upcoming',
-      type: 'Consultation',
-      location: 'Mount Sinai Hospital'
-    },
-    {
-      id: 2,
-      doctor: 'Dr. Michael Chen',
-      specialty: 'Neurologist',
-      date: '2024-01-10',
-      time: '2:30 PM',
-      status: 'completed',
-      type: 'Follow-up',
-      location: 'UCLA Medical Center'
-    }
-  ];
+  const [appointments, setAppointments] = useState<any[]>([]);
+  // Fetch live appointments for the logged-in patient
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      if (!user || !user.id) return;
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`id, appointment_date, status, reason, doctor:doctors(full_name, specialization, clinic_name)`)
+        .eq('patient_id', user.id)
+        .order('appointment_date', { ascending: false });
+      if (error) {
+        console.error('❌ Error fetching appointments:', error);
+        return;
+      }
+      setAppointments(data || []);
+    };
+    fetchAppointments();
+  }, [user]);
 
   const tabs = [
     { id: 'profile', label: 'Profile Settings', icon: User },
@@ -500,57 +496,66 @@ export default function UserProfile() {
                   </div>
 
                   <div className="space-y-4">
-                    {appointments.map((appointment) => (
-                      <div
-                        key={appointment.id}
-                        className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300"
-                      >
-                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <h3 className="text-lg font-semibold text-gray-900">
-                                {appointment.doctor}
-                              </h3>
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
-                                {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                              </span>
-                            </div>
-                            <p className="text-blue-600 font-medium mb-2">{appointment.specialty}</p>
-                            <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                              <div className="flex items-center">
-                                <Calendar className="w-4 h-4 mr-1" />
-                                {appointment.date}
+                    {appointments.length === 0 ? (
+                      <div className="text-center text-gray-500 py-8">No appointments found.</div>
+                    ) : (
+                      appointments.map((appointment) => {
+                        const apptDate = new Date(appointment.appointment_date);
+                        const formattedDate = apptDate.toLocaleDateString();
+                        const formattedTime = apptDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        return (
+                          <div
+                            key={appointment.id}
+                            className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300"
+                          >
+                            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-3 mb-2">
+                                  <h3 className="text-lg font-semibold text-gray-900">
+                                    {appointment.doctor?.full_name || 'Doctor'}
+                                  </h3>
+                                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
+                                    {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                                  </span>
+                                </div>
+                                <p className="text-blue-600 font-medium mb-2">{appointment.doctor?.specialization || ''}</p>
+                                <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                                  <div className="flex items-center">
+                                    <Calendar className="w-4 h-4 mr-1" />
+                                    {formattedDate}
+                                  </div>
+                                  <div className="flex items-center">
+                                    <Clock className="w-4 h-4 mr-1" />
+                                    {formattedTime}
+                                  </div>
+                                  <div className="flex items-center">
+                                    <MapPin className="w-4 h-4 mr-1" />
+                                    {appointment.doctor?.clinic_name || ''}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex items-center">
-                                <Clock className="w-4 h-4 mr-1" />
-                                {appointment.time}
-                              </div>
-                              <div className="flex items-center">
-                                <MapPin className="w-4 h-4 mr-1" />
-                                {appointment.location}
+                              <div className="flex space-x-2">
+                                {appointment.status === 'scheduled' && (
+                                  <>
+                                    <button className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-medium hover:bg-green-200 transition-colors">
+                                      Join Call
+                                    </button>
+                                    <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors">
+                                      Reschedule
+                                    </button>
+                                  </>
+                                )}
+                                {appointment.status === 'completed' && (
+                                  <button className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-200 transition-colors">
+                                    View Report
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
-                          <div className="flex space-x-2">
-                            {appointment.status === 'upcoming' && (
-                              <>
-                                <button className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-medium hover:bg-green-200 transition-colors">
-                                  Join Call
-                                </button>
-                                <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors">
-                                  Reschedule
-                                </button>
-                              </>
-                            )}
-                            {appointment.status === 'completed' && (
-                              <button className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-200 transition-colors">
-                                View Report
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               )}

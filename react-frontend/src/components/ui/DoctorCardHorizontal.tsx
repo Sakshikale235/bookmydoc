@@ -1,155 +1,123 @@
 import React from 'react';
+import { MapPin, Clock, DollarSign, Calendar, Award, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Calendar, 
-  User, 
-  GraduationCap, 
-  Stethoscope, 
-  Clock,
-  UserCheck
-} from 'lucide-react';
-import { Doctor } from '@/types/doctor';
 
-interface DoctorCardProps {
-  doctor: Doctor;
-  onBookAppointment: (doctor: Doctor) => void;
-  onViewProfile: (doctor: Doctor) => void;
+interface Doctor {
+  id: string;
+  full_name: string;
+  email?: string;
+  phone?: string;
+  specialization: string;
+  qualification?: string;
+  experience: number;
+  clinic_name: string;
+  consultation_fee: number;
+  location: string;
+  bio?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
-export const DoctorCardHorizontal: React.FC<DoctorCardProps> = ({ 
-  doctor, 
-  onBookAppointment, 
-  onViewProfile 
+interface DoctorCardHorizontalProps {
+  doctor: Doctor;
+  onBookAppointment?: (doctor: Doctor) => void;
+  onViewProfile?: (doctor: Doctor) => void;
+}
+
+export const DoctorCardHorizontal: React.FC<DoctorCardHorizontalProps> = ({
+  doctor,
+  onBookAppointment,
+  onViewProfile
 }) => {
-  const getSpecializationColor = (specialization: string) => {
-    const colors = {
-      'General Physician': 'bg-blue-50 text-blue-700 border-blue-200',
-      'Dermatologist': 'bg-green-50 text-green-700 border-green-200',
-      'Gynaecologist': 'bg-purple-50 text-purple-700 border-purple-200',
-      'Cardiologist': 'bg-red-50 text-red-700 border-red-200',
-      'Neurologist': 'bg-indigo-50 text-indigo-700 border-indigo-200'
-    };
-    return colors[specialization as keyof typeof colors] || 'bg-gray-50 text-gray-700 border-gray-200';
-  };
-
-  const getGenderIcon = (gender: string) => {
-    return gender === 'Female' ? '♀' : '♂';
-  };
-
   return (
-    <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-blue-200 group">
-      <div className="flex flex-col sm:flex-row gap-6">
-        {/* Profile Photo */}
-        <div className="flex-shrink-0 self-center sm:self-start">
-          <div className="relative">
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300">
-              {doctor.photo ? (
-                <img
-                  src={doctor.photo}
-                  alt={doctor.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&background=2563eb&color=ffffff&size=112`;
-                  }}
-                />
-              ) : (
-                <img
-                  src={`https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.name)}&background=2563eb&color=ffffff&size=112`}
-                  alt={doctor.name}
-                  className="w-full h-full object-cover"
-                />
+    <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
+      <div className="p-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left Section - Doctor Image & Basic Info */}
+          <div className="flex-shrink-0">
+            <div className="relative">
+              <img
+                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.full_name)}&size=128&background=3b82f6&color=fff&bold=true`}
+                alt={doctor.full_name}
+                className="w-32 h-32 rounded-lg object-cover"
+              />
+              <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
+                {doctor.experience}+ Years
+              </div>
+            </div>
+          </div>
+
+          {/* Middle Section - Doctor Details */}
+          <div className="flex-grow space-y-3">
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                {doctor.full_name}
+              </h3>
+              <p className="text-blue-600 font-semibold text-lg">
+                {doctor.specialization}
+              </p>
+              {doctor.qualification && (
+                <p className="text-gray-600 text-sm mt-1">
+                  {doctor.qualification}
+                </p>
               )}
             </div>
-            <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white rounded-full p-1.5">
-              <Stethoscope className="w-4 h-4" />
-            </div>
-          </div>
-        </div>
 
-        {/* Doctor Information */}
-        <div className="flex-grow space-y-4">
-          {/* Header */}
-          <div className="space-y-2">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors duration-200">
-                {doctor.name}
-              </h3>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border self-start ${getSpecializationColor(doctor.specialization)}`}>
-                {doctor.specialization}
-              </span>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-              <div className="flex items-center gap-1">
-                <User className="w-4 h-4" />
-                <span>{doctor.gender} {getGenderIcon(doctor.gender)}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-center text-gray-600">
+                <MapPin className="w-4 h-4 mr-2 text-green-600 flex-shrink-0" />
+                <span className="text-sm truncate">{doctor.clinic_name}</span>
               </div>
-              <div className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                <span>{doctor.age} years</span>
+              
+              <div className="flex items-center text-gray-600">
+                <MapPin className="w-4 h-4 mr-2 text-orange-600 flex-shrink-0" />
+                <span className="text-sm truncate">{doctor.location}</span>
               </div>
-              <div className="flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                <span>{doctor.experience} years experience</span>
+
+              <div className="flex items-center text-gray-600">
+                <Award className="w-4 h-4 mr-2 text-purple-600 flex-shrink-0" />
+                <span className="text-sm">{doctor.experience} years experience</span>
+              </div>
+
+              <div className="flex items-center text-gray-600">
+                <DollarSign className="w-4 h-4 mr-2 text-green-600 flex-shrink-0" />
+                <span className="text-sm font-semibold text-green-700">
+                  ${doctor.consultation_fee}
+                </span>
               </div>
             </div>
-          </div>
 
-          {/* Qualifications */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-gray-700">
-              <GraduationCap className="w-4 h-4 text-blue-600" />
-              <span className="font-medium text-sm">Qualifications:</span>
-            </div>
-            <p className="text-gray-600 text-sm ml-6">{doctor.degree}</p>
-          </div>
+            {doctor.bio && (
+              <p className="text-gray-600 text-sm line-clamp-2 mt-2">
+                {doctor.bio}
+              </p>
+            )}
 
-          {/* Hospital */}
-          <div className="flex items-center gap-2 text-gray-700">
-            <MapPin className="w-4 h-4 text-blue-600" />
-            <span className="font-medium text-sm">{doctor.hospital}</span>
-          </div>
-
-          {/* Contact Information */}
-          <div className="space-y-3 pt-2 border-t border-gray-100">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <a
-                href={`tel:${doctor.phone}`}
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors duration-200 group/contact"
-              >
-                <Phone className="w-4 h-4 group-hover/contact:scale-110 transition-transform duration-200" />
-                <span className="text-sm font-medium">{doctor.phone}</span>
-              </a>
-              <a
-                href={`mailto:${doctor.email}`}
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors duration-200 group/contact"
-              >
-                <Mail className="w-4 h-4 group-hover/contact:scale-110 transition-transform duration-200" />
-                <span className="text-sm font-medium truncate">{doctor.email}</span>
-              </a>
+            {/* Rating/Reviews placeholder */}
+            <div className="flex items-center space-x-1 text-yellow-500">
+              <Star className="w-4 h-4 fill-current" />
+              <Star className="w-4 h-4 fill-current" />
+              <Star className="w-4 h-4 fill-current" />
+              <Star className="w-4 h-4 fill-current" />
+              <Star className="w-4 h-4 fill-current" />
+              <span className="text-gray-600 text-sm ml-2">(4.9)</span>
             </div>
           </div>
 
-          {/* Action Buttons */}
-           {/* <Link to="/book_appointment" className="no-underline"> */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          {/* Right Section - Action Buttons */}
+          <div className="flex flex-col justify-center space-y-3 lg:min-w-[180px]">
             <Link
-                      to={`/book_appointment/${doctor.id}`}
-                      className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-200"
+               to={`/book_appointment/${doctor.id}`}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold text-center transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
             >
               <Calendar className="w-4 h-4" />
-              Book Appointment
+              <span>Book Now</span>
             </Link>
-
+            
             <button
-              onClick={() => onViewProfile(doctor)}
-              className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105 border border-gray-200 hover:border-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-200"
+              onClick={() => onViewProfile?.(doctor)}
+              className="bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-300 px-6 py-3 rounded-lg font-semibold text-center transition-all duration-200 hover:border-blue-600 hover:text-blue-600"
             >
-              <UserCheck className="w-4 h-4" />
               View Profile
             </button>
           </div>

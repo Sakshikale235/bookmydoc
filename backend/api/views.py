@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 import os
+import math
 import google.generativeai as genai
 from dotenv import load_dotenv
 from datetime import datetime
@@ -10,16 +11,20 @@ import jwt
 from supabase import create_client, Client
 from functools import wraps
 
-# Load API key
+# -----------------------------
+# Load environment variables
+# -----------------------------
 load_dotenv()
 GEN_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEN_API_KEY)
 
-# Supabase client
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
+# -----------------------------
+# Optional JWT authentication
+# -----------------------------
 def require_auth(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
@@ -28,9 +33,8 @@ def require_auth(view_func):
             return JsonResponse({"error": "Authorization header missing or invalid"}, status=401)
         token = auth_header.split(' ')[1]
         try:
-            # Verify JWT with Supabase
-            payload = jwt.decode(token, options={"verify_signature": False})  # Supabase uses RS256, but for simplicity, decode without verify
-            # In production, verify signature with Supabase's public key
+            # Decode without verifying signature (for dev/testing)
+            payload = jwt.decode(token, options={"verify_signature": False})
             request.user_id = payload.get('sub')
         except jwt.ExpiredSignatureError:
             return JsonResponse({"error": "Token expired"}, status=401)
@@ -39,8 +43,11 @@ def require_auth(view_func):
         return view_func(request, *args, **kwargs)
     return wrapper
 
+# -----------------------------
+# Main endpoint
+# -----------------------------
 @csrf_exempt
-# @require_auth  # Commented out for now due to login/signup issues
+# @require_auth  # Uncomment after login/signup setup
 def analyze_symptoms(request):
     if request.method != "POST":
         return JsonResponse({"error": "Only POST requests allowed"}, status=405)
@@ -48,20 +55,26 @@ def analyze_symptoms(request):
     try:
         data = json.loads(request.body)
 
-        # Optional user details
-        height = data.get("height", "Not provided")
-        weight = data.get("weight", "Not provided")
-        age = data.get("age", "Not provided")
-        gender = data.get("gender", "Not provided")
+        # -----------------------------
+        # Extract user info
+        # -----------------------------
+        height = data.get("height", None)
+        weight = data.get("weight", None)
+        age = data.get("age", None)
+        gender = data.get("gender", None)
         symptoms = data.get("symptoms", "")
-        location = data.get("location", "Not provided")
+        location = data.get("location", None)
+        user_lat = data.get("latitude", None)
+        user_lng = data.get("longitude", None)
 
         if not symptoms:
             return JsonResponse({"error": "Please provide your symptoms"}, status=400)
 
+        # -----------------------------
         # Calculate BMI
+        # -----------------------------
         bmi = None
-        if height != "Not provided" and weight != "Not provided":
+        if height and weight:
             try:
                 h_m = float(height) / 100
                 w_kg = float(weight)
@@ -69,83 +82,117 @@ def analyze_symptoms(request):
             except:
                 bmi = None
 
-        # Current date
+        # -----------------------------
+        # Prepare Gemini prompt
+        # -----------------------------
         today = datetime.today()
         date_str = today.strftime("%Y-%m-%d")
         month = today.month
 
-        # Gemini prompt
         prompt = f"""
-Hello! I am your AI health assistant. I am here to assist you.
-Here is the information provided:
-- Height: {height}
-- Weight: {weight}
-- Age: {age}
-- Gender: {gender}
-- BMI: {bmi if bmi else 'Not calculated'}
-- Location: {location}
-- Date: {date_str} (month: {month})
-
-Please analyze the following symptoms: {symptoms}
-
-Respond ONLY with valid JSON, no markdown or code fences.
-Format strictly like this:
-{{
-    "possible_diseases": ["Disease 1", "Disease 2"],
-    "severity": "mild / moderate / severe",
-    "doctor_recommendation": "General doctor or Specialist",
-    "advice": "Advice text",
-    "bmi": {bmi if bmi else 'null'}
-}}
+Hello! I am your AI health assistant.
+Height: {height}, Weight: {weight}, Age: {age}, Gender: {gender}, BMI: {bmi if bmi else 'null'}, Location: {location}, Date: {date_str} (month: {month})
+Symptoms: {symptoms}
+Respond ONLY with valid JSON like:
+{{"possible_diseases": ["Disease1"], "severity": "mild/moderate/severe", "doctor_recommendation": "General doctor/Specialist", "advice": "Advice text", "bmi": {bmi if bmi else 'null'}}}
 """
 
-        # Call Gemini API - Try multiple model names
+        # -----------------------------
+        # Call Gemini API (try multiple models)
+        # -----------------------------
         model_names = [
             "gemini-1.5-flash-latest",
-            "gemini-1.5-flash", 
+            "gemini-1.5-flash",
             "gemini-2.0-flash-exp",
             "gemini-1.5-pro-latest",
             "gemini-1.5-pro"
         ]
-        
         response = None
         last_error = None
-        
         for model_name in model_names:
             try:
                 model = genai.GenerativeModel(model_name)
                 response = model.generate_content(prompt)
-                break  # Success, exit the loop
+                break
             except Exception as e:
                 last_error = str(e)
-                continue  # Try next model
-        
+                continue
+
         if response is None:
-            return JsonResponse({
-                "error": f"All model attempts failed. Last error: {last_error}"
-            }, status=500)
+            return JsonResponse({"error": f"All models failed. Last error: {last_error}"}, status=500)
 
         raw_text = response.text.strip()
 
-        # Remove possible markdown fences
+        # -----------------------------
+        # Clean markdown/code fences
+        # -----------------------------
         if raw_text.startswith("```"):
             raw_text = raw_text.strip("`")
             if raw_text.startswith("json"):
                 raw_text = raw_text[4:].strip()
 
-        # Try parsing JSON
+        # -----------------------------
+        # Parse JSON safely
+        # -----------------------------
         try:
             reply_json = json.loads(raw_text)
         except json.JSONDecodeError:
             reply_json = {"message": raw_text, "bmi": bmi}
 
+        # -----------------------------
+        # Fetch recommended doctors from Supabase
+        # -----------------------------
+        doctors_list = []
+        recommended_specialty = reply_json.get("doctor_recommendation")
+        if recommended_specialty:
+            try:
+                query = supabase.table("doctors") \
+                    .select("""
+                        *,
+                        doctor_specialties!inner(
+                            specialties!inner(name)
+                        )
+                    """) \
+                    .ilike("doctor_specialties.specialties.name", f"%{recommended_specialty}%")
+
+                # Add location filter for 2km radius (approximate bounding box)
+                if user_lat is not None and user_lng is not None:
+                    # Approximate 2km: ~0.018 degrees lat, lng adjusted
+                    lat_delta = 0.018
+                    lng_delta = 0.018 / math.cos(math.radians(user_lat)) if user_lat != 0 else 0.018
+                    query = query \
+                        .gte("latitude", user_lat - lat_delta) \
+                        .lte("latitude", user_lat + lat_delta) \
+                        .gte("longitude", user_lng - lng_delta) \
+                        .lte("longitude", user_lng + lng_delta)
+
+                doctors_data = query \
+                    .order("experience", desc=True) \
+                    .limit(3) \
+                    .execute()
+
+                if doctors_data.data:
+                    for doc in doctors_data.data:
+                        doctors_list.append({
+                            "full_name": doc.get("full_name"),
+                            "clinic_name": doc.get("clinic_name"),
+                            "experience": doc.get("experience"),
+                            "phone": doc.get("phone"),
+                            "consultation_fee": doc.get("consultation_fee")
+                        })
+            except Exception as e:
+                print(f"Error fetching doctors: {e}")
+                doctors_list = []
+
+        reply_json["recommended_doctors"] = doctors_list
         return JsonResponse(reply_json, safe=False)
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
-
-# Alternative version with model listing (for debugging)
+# -----------------------------
+# Helper endpoint: list available Gemini models
+# -----------------------------
 @csrf_exempt
 def list_available_models(request):
     """Helper endpoint to list available Gemini models"""
@@ -161,167 +208,3 @@ def list_available_models(request):
         return JsonResponse({"available_models": models})
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
-
-
-
-# from django.shortcuts import render
-
-# from django.http import JsonResponse
-# from django.views.decorators.csrf import csrf_exempt
-# import json
-# import os
-# import google.generativeai as genai
-# from dotenv import load_dotenv
-# from datetime import datetime
-
-# # Load API key from .env
-# load_dotenv()
-# GEN_API_KEY = os.getenv("GEMINI_API_KEY")
-# genai.configure(api_key=GEN_API_KEY)
-
-# @csrf_exempt
-# def analyze_symptoms(request):
-#     if request.method != "POST":
-#         return JsonResponse({"error": "Only POST requests allowed"}, status=405)
-
-#     try:
-#         data = json.loads(request.body)
-
-#         # Optional user details
-#         height = data.get("height", "Not provided")
-#         weight = data.get("weight", "Not provided")
-#         age = data.get("age", "Not provided")
-#         gender = data.get("gender", "Not provided")
-#         symptoms = data.get("symptoms", "")
-#         location = data.get("location", "Not provided")  # city or lat,lng
-
-#         if not symptoms:
-#             return JsonResponse({"error": "Please provide your symptoms"}, status=400)
-
-#         # Calculate BMI
-#         bmi = None
-#         if height != "Not provided" and weight != "Not provided":
-#             try:
-#                 h_m = float(height) / 100
-#                 w_kg = float(weight)
-#                 bmi = round(w_kg / (h_m ** 2), 1)
-#             except:
-#                 bmi = None
-
-#         # Current date and month
-#         today = datetime.today()
-#         date_str = today.strftime("%Y-%m-%d")
-#         month = today.month
-
-#         # Gemini prompt with severity handling
-#         prompt = f"""
-# Hello! I am your AI health assistant. I am here to assist you.
-# Here is the information provided:
-# - Height: {height}
-# - Weight: {weight}
-# - Age: {age}
-# - Gender: {gender}
-# - BMI: {bmi if bmi else 'Not calculated'}
-# - Location: {location}
-# - Date: {date_str} (month: {month})
-
-# Please analyze the following symptoms: {symptoms}
-
-# 1. Identify possible diseases/health issues.
-# 2. Assess symptom severity (mild, moderate, severe).
-# 3. Recommend the appropriate doctor:
-#    - If mild: local/general doctor
-#    - If severe: mention specialist required
-# 4. Give advice for mild cases (if self-care or local consultation is enough)
-
-# Respond in JSON format exactly like this:
-# {{
-#     "possible_diseases": ["Disease 1", "Disease 2", ...],
-#     "severity": "mild / moderate / severe",
-#     "doctor_recommendation": "General doctor or Specialist",
-#     "advice": "Any specific advice for mild cases",
-#     "bmi": {bmi if bmi else 'null'}
-# }}
-# """
-
-#         # Call Gemini API
-#         model = genai.GenerativeModel("gemini-1.5-flash")
-#         response = model.generate_content(prompt)
-
-#         # Try parsing JSON from Gemini response
-#         try:
-#             reply_json = json.loads(response.text)
-#         except:
-#             # fallback if Gemini returns plain text
-#             reply_json = {"message": response.text, "bmi": bmi}
-
-#         return JsonResponse(reply_json)
-
-#     except Exception as e:
-#         return JsonResponse({"error": str(e)}, status=500)
-
-
-
-
-# from django.http import JsonResponse
-# from django.views.decorators.csrf import csrf_exempt
-# import json
-# import os
-# import google.generativeai as genai
-# from dotenv import load_dotenv
-
-# # Load API key from .env
-# load_dotenv()
-# GEN_API_KEY = os.getenv("GEMINI_API_KEY")
-# genai.configure(api_key=GEN_API_KEY)
-
-# @csrf_exempt
-# def analyze_symptoms(request):
-#     if request.method != "POST":
-#         return JsonResponse({"error": "Only POST requests allowed"}, status=405)
-
-#     try:
-#         print("Request body:", request.body)
-#         data = json.loads(request.body)
-#         # Optional user details
-#         height = data.get("height", "Not provided")
-#         weight = data.get("weight", "Not provided")
-#         age = data.get("age", "Not provided")
-#         gender = data.get("gender", "Not provided")
-#         symptoms = data.get("symptoms", "")
-
-#         if not symptoms:
-#             return JsonResponse({"error": "Please provide your symptoms"}, status=400)
-
-#         # Build dynamic Gemini prompt
-#         prompt = f"""
-# Hello! I am your AI health assistant. I am here to assist you.
-# Before analyzing your symptoms, here is the information you provided:
-# - Height: {height}
-# - Weight: {weight}
-# - Age: {age}
-# - Gender: {gender}
-
-# Now, please analyze the following symptoms: {symptoms} and calculate the BMI if height and weight are provided.
-
-# 1. Possible Diseases/Health Issues
-# - Disease 1
-# - Disease 2
-# ...
-
-# 2. Doctor Recommendation
-# - General doctor or Specialist (if applicable)
-# Be as brief and clear as possible.
-# Please respond in a clear, user-friendly format.
-# """
-
-#         # Call Gemini API
-#         model = genai.GenerativeModel("gemini-1.5-flash")
-#         response = model.generate_content(prompt)
-
-#         return JsonResponse({"reply": response.text})
-
-#     except Exception as e:
-#         return JsonResponse({"error": str(e)}, status=500)
-

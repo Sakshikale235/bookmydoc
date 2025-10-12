@@ -243,62 +243,32 @@ const Chatbot: React.FC = () => {
 
     // Handle doctor suggestion response
     if (step === 'doctor_suggestion') {
-      if (userResponse === 'yes') {
-        setIsTyping(true);
-        try {
-          if (!lastAnalysisResult?.recommended_specialty) {
-            throw new Error("No specialty recommendation available");
-          }
-
-          const { data: doctors, error } = await supabase
-            .from('doctors')
-            .select(`
-              *,
-              doctor_specialties!inner(
-                specialties!inner(name)
-              )
-            `)
-            .eq('doctor_specialties.specialties.name', lastAnalysisResult.recommended_specialty)
-            .order('experience', { ascending: false })
-            .limit(3);
-
-          if (error) throw error;
-
-          if (doctors && doctors.length > 0) {
-            let doctorText = "👨‍⚕️ **Here are some recommended doctors in your area:**\n\n";
-            doctors.forEach((doctor: any) => {
-              doctorText += `• **Dr. ${doctor.full_name}**\n`;
-              doctorText += `  📚 ${doctor.experience} years of experience\n`;
-              doctorText += `  🏥 ${doctor.clinic_name}\n`;
-              doctorText += `  💰 Consultation Fee: ₹${doctor.consultation_fee}\n`;
-              doctorText += `  📞 ${doctor.phone}\n\n`;
-            });
-            pushMessage({
-              id: "ai-doctors",
-              text: doctorText,
-              sender: "ai",
-              timestamp: new Date(),
-            });
-          } else {
-            pushMessage({
-              id: "ai-no-doctors",
-              text: "I couldn't find any specialists in your area at the moment. Please consider consulting a general physician.",
-              sender: "ai",
-              timestamp: new Date(),
-            });
-          }
-        } catch (err) {
-          console.error('Error fetching doctors:', err);
+      if (userResponse === "yes") {
+        // If lastAnalysisResult has recommended_doctors, just show them
+        if (lastAnalysisResult?.recommended_doctors?.length) {
+          let doctorText = "👨‍⚕️ **Here are some recommended doctors nearby:**\n\n";
+          lastAnalysisResult.recommended_doctors.forEach((doc: any) => {
+            doctorText += `• **Dr. ${doc.full_name}**\n`;
+            if (doc.clinic_name) doctorText += `  🏥 ${doc.clinic_name}\n`;
+            if (doc.experience) doctorText += `  📚 ${doc.experience} years\n`;
+            if (doc.consultation_fee) doctorText += `  💰 Fee: ₹${doc.consultation_fee}\n`;
+            if (doc.phone) doctorText += `  📞 ${doc.phone}\n\n`;
+          });
           pushMessage({
-            id: "ai-error",
-            text: "Sorry, I encountered an error while searching for doctors. Please try again later.",
+            id: "ai-doctors",
+            text: doctorText,
             sender: "ai",
             timestamp: new Date(),
           });
-        } finally {
-          setIsTyping(false);
+        } else {
+          pushMessage({
+            id: "ai-no-doctors",
+            text: "I couldn't find any specialists nearby. Please consider consulting a general physician.",
+            sender: "ai",
+            timestamp: new Date(),
+          });
         }
-      } else if (userResponse === 'no') {
+      } else if (userResponse === "no") {
         pushMessage({
           id: "ai-goodbye",
           text: "Alright! If you need any other assistance, feel free to ask. Take care!",
@@ -422,30 +392,45 @@ const Chatbot: React.FC = () => {
       if (parsedResult.possible_diseases) {
         formattedText += "🧾 **Based on your symptoms, location, and the current season, here's my analysis:**\n\n";
         formattedText += `• **Possible Conditions:** ${parsedResult.possible_diseases.join(", ")}\n\n`;
-        if (parsedResult.recommended_specialty) {
-          formattedText += `🔎 **Recommended Specialist:** ${parsedResult.recommended_specialty}\n\n`;
-        }
-        if (parsedResult.seasonal_analysis) {
-          formattedText += `🌡️ **Seasonal Context:**\n${parsedResult.seasonal_analysis}\n\n`;
-        }
+        formattedText += `⚠️ **Severity:** ${parsedResult.severity || "Not available"}\n\n`;
         formattedText += `💡 **Advice:** ${parsedResult.advice || "No specific advice available"}\n\n`;
-        // Send analysis result
+
         pushMessage({
           id: "ai-result",
           text: formattedText,
           sender: "ai",
           timestamp: new Date(),
         });
-        // Ask about doctor suggestions
-        setTimeout(() => {
+
+        // If backend returned recommended doctors, display them
+        if (parsedResult.recommended_doctors && parsedResult.recommended_doctors.length > 0) {
+          let doctorText = "👨‍⚕️ **Recommended doctors for you:**\n\n";
+          parsedResult.recommended_doctors.forEach((doc: any) => {
+            doctorText += `• **Dr. ${doc.full_name}**\n`;
+            if (doc.clinic_name) doctorText += `  🏥 ${doc.clinic_name}\n`;
+            if (doc.experience) doctorText += `  📚 ${doc.experience} years of experience\n`;
+            if (doc.consultation_fee) doctorText += `  💰 Fee: ₹${doc.consultation_fee}\n`;
+            if (doc.phone) doctorText += `  📞 ${doc.phone}\n\n`;
+          });
+
           pushMessage({
-            id: "ai-doctor-prompt",
-            text: "Would you like me to suggest some doctors nearby who specialize in treating these conditions? (yes/no)",
+            id: "ai-doctors",
+            text: doctorText,
             sender: "ai",
             timestamp: new Date(),
           });
-          setStep("doctor_suggestion");
-        }, 1000);
+        } else {
+          // Ask user if they want doctor suggestion
+          setTimeout(() => {
+            pushMessage({
+              id: "ai-doctor-prompt",
+              text: "Would you like me to suggest some doctors nearby? (yes/no)",
+              sender: "ai",
+              timestamp: new Date(),
+            });
+            setStep("doctor_suggestion");
+          }, 1000);
+        }
       }
 
     } catch (err) {
