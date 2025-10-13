@@ -101,14 +101,17 @@
 
 
 import { Card, CardContent } from "@/components/ui/card";
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Heart, Brain, Baby, Eye, Bone, Scissors, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, useTransform, useViewportScroll } from 'framer-motion';
 import { useState, useEffect } from "react";
 
 const SpecialistsCarousel = () => {
+  const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [itemsPerView, setItemsPerView] = useState(4);
+
 
   const getItemsPerView = () => {
     if (typeof window !== 'undefined') {
@@ -132,7 +135,7 @@ const SpecialistsCarousel = () => {
   const specialists = [
     {
       id: 1,
-      name: "Cardiology",
+      name: "Cardiologist",
       icon: Heart,
       description: "Heart and cardiovascular system specialists",
       doctorsCount: "25+ Doctors",
@@ -140,31 +143,31 @@ const SpecialistsCarousel = () => {
     },
     {
       id: 2,
-      name: "Neurology",
+      name: "General Physician",
       icon: Brain,
-      description: "Brain and nervous system experts",
+      description: "primary care and common illness expert",
       doctorsCount: "18+ Doctors",
       color: "text-purple-500"
     },
     {
       id: 3,
-      name: "Pediatrics",
+      name: "Dermatologist",
       icon: Baby,
-      description: "Child healthcare specialists",
+      description: "skin, hair, and nail experts",
       doctorsCount: "30+ Doctors",
       color: "text-pink-500"
     },
     {
       id: 4,
-      name: "Ophthalmology",
+      name: "Gynecologist",
       icon: Eye,
-      description: "Eye care and vision specialists",
+      description: "women’s overall health and reproductive care experts",
       doctorsCount: "15+ Doctors",
       color: "text-blue-500"
     },
     {
       id: 5,
-      name: "Orthopedics",
+      name: "Orthopedic Surgeon",
       icon: Bone,
       description: "Bone and joint specialists",
       doctorsCount: "22+ Doctors",
@@ -257,6 +260,7 @@ const SpecialistsCarousel = () => {
                          <Button 
                            size="sm" 
                            className="w-full bg-[#1c5a6a] hover:shadow-medical transition-all hover:bg-[#56CCF2] duration-300 text-xs sm:text-sm"
+                           onClick={() => navigate(`/doctor_consultation?specialization=${encodeURIComponent(specialist.name)}`)}
                          >
                            View Doctors
                          </Button>

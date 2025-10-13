@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, MapPin, Calendar, Heart, Clock, Shield, Crosshair } from "lucide-react";
@@ -16,6 +17,8 @@ const HeroSection = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [location, setLocation] = useState("");
   const [loadingLocation, setLoadingLocation] = useState(false);
+  const navigate = useNavigate();
+
 
   const slides = [
     {
@@ -173,13 +176,15 @@ const HeroSection = () => {
                 whileHover={{ scale: 1.05, y: -5 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Button
-                  size="lg"
-                  className="bg-blue-gradient hover:bg-blue-gradient/90 transition-all duration-300 text-base lg:text-lg px-6 lg:px-8 py-4 lg:py-6 hover:shadow-glow-blue"
-                >
-                  <Calendar className="mr-2 h-4 lg:h-5 w-4 lg:w-5" />
-                  Book Appointment
-                </Button>
+              <Button
+                size="lg"
+                className="bg-blue-gradient hover:bg-blue-gradient/90 transition-all duration-300 text-base lg:text-lg px-6 lg:px-8 py-4 lg:py-6 hover:shadow-glow-blue"
+                onClick={() => navigate("/doctor_consultation")}
+              >
+                <Calendar className="mr-2 h-4 lg:h-5 w-4 lg:w-5" />
+                 Book Appointment
+              </Button>
+
               </motion.div>
 
               <motion.div
@@ -243,10 +248,18 @@ const HeroSection = () => {
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                 <Button
                   className="w-full h-12 text-base bg-blue-gradient hover:bg-[#56CCF2] transition-all duration-300 hover:shadow-glow-blue"
+                  onClick={() =>
+                    navigate(
+                      `/doctor_consultation?search=${encodeURIComponent(
+                        searchQuery
+                      )}&location=${encodeURIComponent(location)}`
+                    )
+                  }
                 >
                   <Search className="mr-2 h-5 w-5" />
                   Search Doctors
                 </Button>
+
               </motion.div>
             </div>
           </motion.div>

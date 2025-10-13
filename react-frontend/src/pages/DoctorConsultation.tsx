@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Heart, Users, MapPin, Phone } from 'lucide-react';
 import { DoctorCardHorizontal } from '@/components/ui/DoctorCardHorizontal';
 import Navigation from '@/components/Navigation';
@@ -16,6 +17,20 @@ const DoctorConsultation: React.FC = () => {
   const [location, setLocation] = useState('');
 
   const cardsRef = useRef<HTMLDivElement | null>(null);
+
+  const locationHook = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(locationHook.search);
+    const search = params.get('search') || '';
+    const loc = params.get('location') || '';
+    const specialization = params.get('specialization') || ''; 
+
+    setSearchTerm(search);
+     setLocation(loc);
+     setSelectedSpecialization(specialization);
+    }, [locationHook.search]);
+
 
   // Fetch doctors from Supabase
   useEffect(() => {
