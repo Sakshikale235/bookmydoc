@@ -1,4 +1,9 @@
+import { ReactNode } from "react";
+
 export interface Doctor {
+  hospital: ReactNode;
+  name: string;
+  photo: string;
   id: string;
   auth_id?: string;
   full_name: string;

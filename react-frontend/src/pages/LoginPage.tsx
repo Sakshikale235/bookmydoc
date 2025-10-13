@@ -254,7 +254,7 @@ const { error: insertError } = await supabase.from("patients").insert([
   const btnStyles: React.CSSProperties = {
     width: '100%',
     height: '48px',
-    backgroundColor: '#7494ec',
+    backgroundColor: '#2D9CDB',
     boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
     borderRadius: '8px',
     border: 'none',
@@ -300,7 +300,7 @@ const { error: insertError } = await supabase.from("patients").insert([
   };
 
   const linkStyles: React.CSSProperties = {
-    color: '#7494ec',
+    color: '#2D9CDB',
     textDecoration: 'underline'
   };
 
@@ -315,7 +315,7 @@ const { error: insertError } = await supabase.from("patients").insert([
     left: isActive ? '50%' : '-250%',
     width: '300%',
     height: '100%',
-    background: '#7494ec',
+    background: '#2D9CDB',
     borderRadius: '150px',
     zIndex: 2,
     transition: '1.8s ease-in-out'

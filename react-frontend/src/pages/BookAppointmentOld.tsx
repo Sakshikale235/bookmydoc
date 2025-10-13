@@ -26,7 +26,7 @@ import { doctorsData } from '@/data/doctors';
 
 const BookAppointment = () => {
   const { doctorId } = useParams();
-  const doctor = doctorsData.find(d => d.id === Number(doctorId));
+  const doctor = doctorsData.find(d => String(d.id) === doctorId);
   console.log('Doctor ID:', doctorId);
   console.log('Doctor Data:', doctor);
   const [currentDate, setCurrentDate] = useState(new Date());
