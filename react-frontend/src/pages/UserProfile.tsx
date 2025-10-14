@@ -17,8 +17,25 @@ import {
   X
 } from "lucide-react";
 
+interface PatientProfile {
+  id?: number;
+  auth_id: string;
+  email: string;
+  full_name: string;
+  phone: string;
+  address: string;
+  weight: string;
+  height: string;
+  blood_group: string;
+  age: string;
+  gender: string;
+  profile_photo: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
 export default function UserProfile() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<PatientProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -26,7 +43,19 @@ export default function UserProfile() {
   const [activeTab, setActiveTab] = useState('profile');
   const navigate = useNavigate();
 
-  const [appointments, setAppointments] = useState<any[]>([]);
+  interface Appointment {
+    id: number;
+    appointment_date: string;
+    status: string;
+    reason: string;
+    doctor: {
+      full_name: string;
+      specialization: string;
+      clinic_name: string;
+    } | null;
+  }
+  
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
   // Fetch live appointments for the logged-in patient
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -40,7 +69,14 @@ export default function UserProfile() {
         console.error('❌ Error fetching appointments:', error);
         return;
       }
-      setAppointments(data || []);
+      // Map doctor array to single object as expected by Appointment type
+      setAppointments(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (data || []).map((appt: any) => ({
+          ...appt,
+          doctor: Array.isArray(appt.doctor) ? appt.doctor[0] : appt.doctor,
+        }))
+      );
     };
     fetchAppointments();
   }, [user]);
@@ -109,7 +145,7 @@ export default function UserProfile() {
   }, [navigate]);
 
   // Handle avatar upload
-  const handleFileChange = async (event: any) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
 
@@ -147,16 +183,20 @@ export default function UserProfile() {
 
       setUser({ ...user, profile_photo: urlWithTimestamp });
       alert("✅ Profile photo updated successfully!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Upload error:", error);
-      alert(`Error uploading image: ${error.message}`);
+      if (error instanceof Error) {
+        alert(`Error uploading image: ${error.message}`);
+      } else {
+        alert("Error uploading image: Unknown error");
+      }
     } finally {
       setUploading(false);
     }
   };
 
   // Update user profile
-  const handleSave = async (e: any) => {
+  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
 
@@ -170,8 +210,12 @@ export default function UserProfile() {
         blood_group: user.blood_group || null,
         age: user.age ? parseInt(user.age) : null,
         gender: user.gender || null,
-        latitude: user.latitude ? parseFloat(user.latitude) : null,
-        longitude: user.longitude ? parseFloat(user.longitude) : null,
+        latitude: user.latitude !== undefined && user.latitude !== null
+          ? parseFloat(user.latitude.toString())
+          : null,
+        longitude: user.longitude !== undefined && user.longitude !== null
+          ? parseFloat(user.longitude.toString())
+          : null,
       };
 
       if (!user.id) {
@@ -194,9 +238,13 @@ export default function UserProfile() {
         alert("✅ Profile updated successfully!");
       }
       setIsEditing(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Update error:", error);
-      alert(`❌ Error saving profile: ${error.message}`);
+      if (error instanceof Error) {
+        alert(`❌ Error saving profile: ${error.message}`);
+      } else {
+        alert("❌ Error saving profile: Unknown error");
+      }
     } finally {
       setSaving(false);
     }
