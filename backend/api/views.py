@@ -94,7 +94,7 @@ Hello! I am your AI health assistant.
 Height: {height}, Weight: {weight}, Age: {age}, Gender: {gender}, BMI: {bmi if bmi else 'null'}, Location: {location}, Date: {date_str} (month: {month})
 Symptoms: {symptoms}
 Respond ONLY with valid JSON like:
-{{"possible_diseases": ["Disease1"], "severity": "mild/moderate/severe", "doctor_recommendation": "General doctor/Specialist", "advice": "Advice text", "bmi": {bmi if bmi else 'null'}}}
+{{"possible_diseases": ["Disease1"], "severity": "mild/moderate/severe", "doctor_recommendation": "Specialization", "advice": "Advice text", "bmi": {bmi if bmi else 'null'}}}
 """
 
         # -----------------------------
@@ -184,8 +184,12 @@ Respond ONLY with valid JSON like:
                 print(f"Error fetching doctors: {e}")
                 doctors_list = []
 
-        reply_json["recommended_doctors"] = doctors_list
+               # ...after building doctors_list and before returning...
+        # reply_json["recommended_doctors"] = doctors_list
+        reply_json["recommended_specialization"] = recommended_specialty  # <-- Add this line
         return JsonResponse(reply_json, safe=False)
+    
+    
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

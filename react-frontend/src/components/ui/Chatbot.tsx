@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Send, Bot, User } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 
 type Message = {
@@ -32,7 +33,7 @@ const Chatbot: React.FC = () => {
   const [dataConfirmed, setDataConfirmed] = useState(false);
   const [updatingField, setUpdatingField] = useState<string | null>(null);
 
-  const [step, setStep] = useState<number | 'doctor_suggestion'>(-1); // Start with -1 to wait for greeting
+  const [step, setStep] = useState<number | 'doctor_suggestion'>(-1);
   const [userInfo, setUserInfo] = useState<UserInfo>({});
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -40,7 +41,6 @@ const Chatbot: React.FC = () => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch patient data on component mount
   useEffect(() => {
     const fetchPatientData = async () => {
       try {
@@ -66,11 +66,10 @@ const Chatbot: React.FC = () => {
             weight: patientData.weight,
             blood_group: patientData.blood_group,
             address: patientData.address,
-            location: patientData.address // Using address as location
+            location: patientData.address
           });
           setPatientDataFetched(true);
 
-          // Initial greeting with patient data
           setMessages([{
             id: getMessageId(),
             text: `Hello ${patientData.full_name}! I have your health information. Let me confirm if these details are correct:\n\n` +
@@ -86,8 +85,6 @@ const Chatbot: React.FC = () => {
           }]);
         }
       } catch (error) {
-        console.error('Error fetching patient data:', error);
-        // Fall back to default greeting if fetch fails
         setMessages([{
           id: getMessageId(),
           text: "Hello! Welcome to your AI health assistant. I'm here to help analyze your symptoms and provide guidance. To get started, please say 'Hi' or 'Hello'.",
@@ -109,7 +106,6 @@ const Chatbot: React.FC = () => {
     "Please describe your symptoms *. Be as specific as possible.",
   ];
 
-  // Auto-scroll
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -117,15 +113,13 @@ const Chatbot: React.FC = () => {
   }, [messages, isTyping]);
 
   const pushMessage = (msg: Message) => setMessages((p) => [...p, msg]);
-  // Generate unique message ID
   const getMessageId = () => {
     return (messageIdRef.current++).toString();
   };
 
   const handleNext = async (value: string) => {
     const userResponse = value.toLowerCase().trim();
-    
-    // Add user message to chat (only once per input)
+
     pushMessage({
       id: getMessageId(),
       text: value,
@@ -133,7 +127,6 @@ const Chatbot: React.FC = () => {
       timestamp: new Date(),
     });
 
-    // Handle data confirmation flow
     if (patientDataFetched && !dataConfirmed) {
       if (userResponse === 'yes') {
         setDataConfirmed(true);
@@ -143,7 +136,7 @@ const Chatbot: React.FC = () => {
           sender: "ai",
           timestamp: new Date(),
         });
-        setStep(5); // Skip to symptoms step
+        setStep(5);
       } else if (userResponse === 'no') {
         pushMessage({
           id: Date.now().toString(),
@@ -153,7 +146,6 @@ const Chatbot: React.FC = () => {
         });
         setUpdatingField('waiting_for_field');
       } else if (updatingField === 'waiting_for_field') {
-        // Handle field selection
         const field = userResponse;
         let validField = true;
         switch (field) {
@@ -182,7 +174,6 @@ const Chatbot: React.FC = () => {
         }
         if (!validField) return;
       } else if (updatingField) {
-        // Handle field update
         const updateData: Partial<UserInfo> = {};
         const newValue = userResponse;
 
@@ -207,7 +198,6 @@ const Chatbot: React.FC = () => {
             break;
         }
 
-        // Update in database
         if (userInfo.id) {
           try {
             const { error } = await supabase
@@ -226,7 +216,6 @@ const Chatbot: React.FC = () => {
             });
             setUpdatingField(null);
           } catch (error) {
-            console.error('Error updating patient data:', error);
             pushMessage({
               id: Date.now().toString(),
               text: "There was an error updating your information. Please try again.",
@@ -241,10 +230,12 @@ const Chatbot: React.FC = () => {
       return;
     }
 
-    // Handle doctor suggestion response
     if (step === 'doctor_suggestion') {
       if (userResponse === "yes") {
-        // If lastAnalysisResult has recommended_doctors, just show them
+        let specialization =
+          lastAnalysisResult?.recommended_specialization ||
+          lastAnalysisResult?.specialization ||
+          "General Physician";
         if (lastAnalysisResult?.recommended_doctors?.length) {
           let doctorText = "👨‍⚕️ **Here are some recommended doctors nearby:**\n\n";
           lastAnalysisResult.recommended_doctors.forEach((doc: any) => {
@@ -255,8 +246,8 @@ const Chatbot: React.FC = () => {
             if (doc.phone) doctorText += `  📞 ${doc.phone}\n\n`;
           });
           pushMessage({
-            id: "ai-doctors",
-            text: doctorText,
+            id: "ai-doctor-prompt",
+            text: `Would you like to see nearby ${specialization} doctors?`,
             sender: "ai",
             timestamp: new Date(),
           });
@@ -287,10 +278,9 @@ const Chatbot: React.FC = () => {
       return;
     }
 
-    // If data is confirmed, proceed with regular flow
     if (!dataConfirmed) return;
 
-    const val = value.trim() || "*"; // treat empty input as skipped
+    const val = value.trim() || "*";
     if (typeof step === 'number') {
       switch (step) {
         case 0:
@@ -314,9 +304,6 @@ const Chatbot: React.FC = () => {
       }
     }
 
-    // Don't push user message again here (already pushed above)
-
-    // Move to next step
     if (step < steps.length - 1) {
       setStep(step + 1);
       pushMessage({
@@ -332,8 +319,6 @@ const Chatbot: React.FC = () => {
     setInputText("");
   };
 
-
-  // perfectly working function
   const sendToBackend = async (data: UserInfo) => {
     setIsTyping(true);
     pushMessage({
@@ -344,7 +329,6 @@ const Chatbot: React.FC = () => {
     });
 
     try {
-      // Format the data for the backend including current date
       const formattedData = {
         height: data.height,
         weight: data.weight,
@@ -358,7 +342,6 @@ const Chatbot: React.FC = () => {
         date: new Date().toISOString()
       };
 
-      // First get the analysis and recommended specialties
       const res = await fetch("http://localhost:8000/api/analyze-symptoms/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -367,14 +350,12 @@ const Chatbot: React.FC = () => {
 
       const result = await res.json();
 
-      // remove typing message
       setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
 
       if (!res.ok) {
         throw new Error(result.error || 'Server error');
       }
 
-      // Try to parse the response if it's a string
       let parsedResult = result;
       if (typeof result === 'string') {
         try {
@@ -384,10 +365,8 @@ const Chatbot: React.FC = () => {
         }
       }
 
-      // Store the parsed result for later use
       setLastAnalysisResult(parsedResult);
 
-      // format result
       let formattedText = "";
       if (parsedResult.possible_diseases) {
         formattedText += "🧾 **Based on your symptoms, location, and the current season, here's my analysis:**\n\n";
@@ -402,7 +381,6 @@ const Chatbot: React.FC = () => {
           timestamp: new Date(),
         });
 
-        // If backend returned recommended doctors, display them
         if (parsedResult.recommended_doctors && parsedResult.recommended_doctors.length > 0) {
           let doctorText = "👨‍⚕️ **Recommended doctors for you:**\n\n";
           parsedResult.recommended_doctors.forEach((doc: any) => {
@@ -420,7 +398,6 @@ const Chatbot: React.FC = () => {
             timestamp: new Date(),
           });
         } else {
-          // Ask user if they want doctor suggestion
           setTimeout(() => {
             pushMessage({
               id: "ai-doctor-prompt",
@@ -446,96 +423,15 @@ const Chatbot: React.FC = () => {
     }
   };
 
-//   const sendToBackend = async (data: UserInfo) => {
-//   setIsTyping(true);
+  const navigate = useNavigate();
 
-//   // Optional: show typing indicator
-//   pushMessage({
-//     id: "ai-typing",
-//     text: "Analyzing your inputs — please wait...",
-//     sender: "ai",
-//     timestamp: new Date(),
-//   });
-
-//   try {
-//     const res = await fetch("http://localhost:8000/api/analyze-symptoms/", {
-//       method: "POST",
-//       headers: { "Content-Type": "application/json" },
-//       body: JSON.stringify(data),
-//     });
-
-//     const result = await res.json(); // ✅ declare result here
-
-//     // remove typing message
-//     setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
-
-//     // Send each piece of result as a separate message
-//     if (result.possible_diseases) {
-//       result.possible_diseases.forEach((disease: string, idx: number) => {
-//         pushMessage({
-//           id: `ai-disease-${idx}`,
-//           text: `🧾 Possible disease: ${disease}`,
-//           sender: "ai",
-//           timestamp: new Date(),
-//         });
-//       });
-
-//       pushMessage({
-//         id: "ai-severity",
-//         text: `⚠️ Severity: ${result.severity || "Not available"}`,
-//         sender: "ai",
-//         timestamp: new Date(),
-//       });
-
-//       pushMessage({
-//         id: "ai-doctor",
-//         text: `👨‍⚕️ Doctor Recommendation: ${result.doctor_recommendation || "Not available"}`,
-//         sender: "ai",
-//         timestamp: new Date(),
-//       });
-
-//       pushMessage({
-//         id: "ai-advice",
-//         text: `💡 Advice: ${result.advice || "No advice given"}`,
-//         sender: "ai",
-//         timestamp: new Date(),
-//       });
-
-//       if (result.bmi !== null && result.bmi !== undefined) {
-//         pushMessage({
-//           id: "ai-bmi",
-//           text: `⚖️ BMI: ${result.bmi}`,
-//           sender: "ai",
-//           timestamp: new Date(),
-//         });
-//       }
-//     } else if (result.message) {
-//       pushMessage({
-//         id: "ai-message",
-//         text: result.message,
-//         sender: "ai",
-//         timestamp: new Date(),
-//       });
-//     } else {
-//       pushMessage({
-//         id: "ai-error-format",
-//         text: "⚠️ Unexpected response format.",
-//         sender: "ai",
-//         timestamp: new Date(),
-//       });
-//     }
-//   } catch (err) {
-//     setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
-//     pushMessage({
-//       id: "ai-error",
-//       text: "❌ Network error or server not responding.",
-//       sender: "ai",
-//       timestamp: new Date(),
-//     });
-//   } finally {
-//     setIsTyping(false);
-//   }
-// };
+  function handleNearbyDoctors() {
+    const specialization =
+      lastAnalysisResult?.recommended_specialization ||
+      lastAnalysisResult?.specialization ||
+      "General Physician";
+    navigate(`/doctor_consultation?specialization=${encodeURIComponent(specialization)}`);
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -545,9 +441,8 @@ const Chatbot: React.FC = () => {
   };
 
   return (
-    <div className="h-screen bg-gray-190   flex items-center justify-center p-6 m-(-5)">
+    <div className="h-screen bg-gray-190 flex items-center justify-center p-6 m-(-5)">
       <div className="w-full max-w-5xl bg-blue-100 rounded-2xl shadow-lg overflow-hidden flex flex-col">
-        {/* Messages */}
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-6 space-y-4 bg-blue-gradient max-h-96"
@@ -569,14 +464,11 @@ const Chatbot: React.FC = () => {
                     : "bg-white text-gray-800 shadow-md rounded-bl-sm"
                     }`}
                 >
-                  {/* <div className="text-sm">{message.text}</div>
-                   */}
                   <div
                     className="text-sm whitespace-pre-line"
                     dangerouslySetInnerHTML={{ __html: message.text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>") }}
                   ></div>
 
-                  {/* Skip button appears only for optional AI questions */}
                   {message.sender === "ai" &&
                     typeof step === 'number' &&
                     typeof step === 'number' && step >= 0 &&
@@ -589,6 +481,14 @@ const Chatbot: React.FC = () => {
                       </button>
                     )}
 
+                  {message.sender === "ai" && message.id === "ai-doctor-prompt" && (
+                    <button
+                      onClick={() => handleNearbyDoctors()}
+                      className="self-start mt-2 ml-12 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all"
+                    >
+                      Consult Doctor
+                    </button>
+                  )}
                 </div>
                 {message.sender === "user" && (
                   <div className="bg-white rounded-full p-2 flex-shrink-0">
@@ -597,7 +497,6 @@ const Chatbot: React.FC = () => {
                 )}
               </div>
 
-              {/* Skip button appears only for AI questions with * skip and not during greeting phase */}
               {message.sender === "ai" &&
                 typeof step === 'number' && step >= 0 &&
                 message.text.includes("* skip") && (
@@ -632,7 +531,6 @@ const Chatbot: React.FC = () => {
           )}
         </div>
 
-        {/* Input */}
         <div className="border-t border-gray-300 p-4 flex space-x-3 items-center">
           <input
             ref={inputRef}

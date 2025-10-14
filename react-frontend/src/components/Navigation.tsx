@@ -84,7 +84,8 @@ const Navigation = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16" ref={navRef}>
           {/* Logo */}
-          <div className="flex items-center space-x-2">
+          {/* Logo */}
+          <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate("/index")}>
             <img src={logo} alt="BookMyDoc Logo" className="h-12 w-auto object-contain" />
           </div>
 
@@ -101,7 +102,7 @@ const Navigation = () => {
                     ${activeItem === item.id && !isSymptomCheckerPage ? "text-[#2D9CDB] after:w-full" : "text-muted-foreground"}
                   `}
                   onClick={() => {
-                    scrollToSection("index");
+                    navigate("/index");
                     setActiveItem("home");
                   }}
                 >
