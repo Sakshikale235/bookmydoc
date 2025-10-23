@@ -17,6 +17,7 @@ import {
   X,
   Stethoscope
 } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 
 interface DoctorFormData {
   // Basic Information
@@ -85,6 +86,8 @@ const DoctorRegistration = () => {
     advanceNotice: '',
     feedbackSummary: false
   });
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const steps = [
     { id: 1, title: 'Basic Information', icon: User },
@@ -101,12 +104,14 @@ const DoctorRegistration = () => {
   };
 
   const handleArrayChange = (field: string, index: number, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: prev[field as keyof DoctorFormData].map((item: any, i: number) => 
-        i === index ? value : item
-      )
-    }));
+    setFormData(prev => {
+      const arr = (prev as any)[field] as any[];
+      const newArr = arr.map((item: any, i: number) => (i === index ? value : item));
+      return {
+        ...prev,
+        [field]: newArr
+      } as unknown as DoctorFormData;
+    });
   };
 
   const addArrayItem = (field: string) => {
@@ -178,10 +183,77 @@ const DoctorRegistration = () => {
   };
 
   const handleSubmit = () => {
-    // Here you would typically send the data to your backend
-    console.log('Doctor registration data:', formData);
-    // Navigate to doctor dashboard
-    navigate('/doctor_selfprofile');
+    // noop - replaced by async handler below
+    return;
+  };
+
+  const handleSubmitAsync = async () => {
+    setUploading(true);
+    try {
+      // ensure user signed in
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        alert('Please sign in before registering as a doctor.');
+        return;
+      }
+
+      let profilePhotoUrl: string | null = null;
+
+      if (profilePhotoFile) {
+        // upload to 'profile-photos' bucket
+        const ext = profilePhotoFile.name.split('.').pop();
+        const fileName = `doctor_${user.id}_${Date.now()}.${ext}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('doctor_photo')
+          .upload(fileName, profilePhotoFile, { upsert: false });
+
+        if (uploadError) {
+          console.error('Upload error', uploadError);
+          alert('Failed to upload profile photo.');
+        } else if (uploadData?.path) {
+          const { data: publicUrlData } = supabase.storage
+            .from('doctor_photo')
+            .getPublicUrl(uploadData.path);
+          profilePhotoUrl = publicUrlData.publicUrl || null;
+        }
+      }
+
+      // build insert payload, include profile_photo only if available
+      const doctorData: any = {
+        auth_id: user.id,
+        full_name: formData.fullName,
+        email: formData.email || null,
+        phone: formData.mobile || null,
+        specialization: formData.specializations.join(', '),
+        qualification: formData.degrees.join(', '),
+        experience: formData.experience ? Number(formData.experience) : null,
+        clinic_name: formData.clinics[0]?.name || null,
+        consultation_fee: null,
+        location: formData.clinics[0]?.address || null,
+        bio: formData.bio || null,
+        assistant_contact: formData.assistantContact || null,
+        common_conditions: formData.conditions && formData.conditions.length ? formData.conditions : null,
+        advance_notice: formData.advanceNotice || null,
+        home_visits: formData.homeVisits,
+        auto_confirm_appointments: formData.autoConfirm,
+        monthly_feedback_summaries: formData.feedbackSummary
+      };
+      if (profilePhotoUrl) doctorData.profile_photo = profilePhotoUrl;
+
+      console.log('Doctor insert payload:', doctorData);
+      const { error: insertError } = await supabase.from('doctors').insert([doctorData]);
+
+      if (insertError) {
+        console.error('Insert doctor error:', insertError);
+        alert('Could not save profile. Please try again.');
+        return;
+      }
+
+      alert('Doctor registration successful');
+      navigate('/doctor_selfprofile');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const isStepValid = (step: number) => {
@@ -350,6 +422,23 @@ const DoctorRegistration = () => {
                   {formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword && (
                     <p className="text-red-500 text-sm mt-1">Passwords do not match</p>
                   )}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Profile Photo (optional)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setProfilePhotoFile(e.target.files ? e.target.files[0] : null)}
+                    />
+                    {profilePhotoFile && (
+                      <div className="mt-2">
+                        <img
+                          src={URL.createObjectURL(profilePhotoFile)}
+                          alt="preview"
+                          className="w-24 h-24 object-cover rounded-full border"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -746,10 +835,11 @@ const DoctorRegistration = () => {
               </button>
             ) : (
               <button
-                onClick={handleSubmit}
-                className="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                onClick={handleSubmitAsync}
+                disabled={uploading}
+                className="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Complete Registration
+                {uploading ? 'Registering...' : 'Complete Registration'}
               </button>
             )}
           </div>

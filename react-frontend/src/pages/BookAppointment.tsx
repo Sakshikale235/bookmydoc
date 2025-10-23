@@ -29,6 +29,7 @@ import { ReviewsSection } from '@/components/appointment/ReviewsSection';
 
 interface Doctor {
   id: string;
+  auth_id?: string;
   full_name: string;
   email: string;
   phone: string;
@@ -43,6 +44,7 @@ interface Doctor {
 
 interface Patient {
   id: string;
+  auth_id?: string;
   full_name: string;
   email: string;
   phone: string;
@@ -203,7 +205,7 @@ const BookAppointment = () => {
     }
   };
 
-  const handleBookAppointment = async () => {
+const handleBookAppointment = async () => {
     try {
       setSubmitting(true);
 
@@ -227,28 +229,34 @@ const BookAppointment = () => {
       if (existingAppointments && existingAppointments.length > 0) {
         alert('This time slot is already booked. Please select another time.');
         setSelectedTime(null);
+        setSubmitting(false);
         return;
       }
 
-      // Insert appointment
-      const { error } = await supabase.from('appointments').insert({
-        doctor_id: doctorId,
-        patient_id: patient?.id,
-        appointment_date: appointmentDate.toISOString(),
-        status: 'scheduled',
-        reason: patientInfo.reason || null
-      });
+      // Insert appointment - THIS IS THE ONLY DATABASE OPERATION
+      const { data: appointmentData, error: appointmentError } = await supabase
+        .from('appointments')
+        .insert({
+          doctor_id: doctorId,
+          patient_id: patient?.id,
+          appointment_date: appointmentDate.toISOString(),
+          status: 'scheduled',
+          reason: patientInfo.reason || null
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (appointmentError) {
+        console.error('Appointment insert error:', appointmentError);
+        throw appointmentError;
+      }
 
-      // Create notification
-      await supabase.from('doctor_notifications').insert({
-        doctor_id: doctorId,
-        message: `New appointment from ${patientInfo.name} on ${format(
-          appointmentDate,
-          'MMM dd, yyyy'
-        )} at ${selectedTime}`
-      });
+      console.log('Appointment created successfully:', appointmentData);
+
+      // NO NOTIFICATION CODE AT ALL - If error still occurs, it's from:
+      // 1. Database trigger on appointments table
+      // 2. Supabase Edge Function
+      // 3. Row Level Security policies trying to create notifications
 
       setStep(3);
     } catch (error: any) {
@@ -258,6 +266,93 @@ const BookAppointment = () => {
       setSubmitting(false);
     }
   };
+
+  // const handleBookAppointment = async () => {
+  //   try {
+  //     setSubmitting(true);
+
+  //     const [time, period] = selectedTime!.split(' ');
+  //     const [hours, minutes] = time.split(':');
+  //     let hour = parseInt(hours);
+  //     if (period === 'PM' && hour !== 12) hour += 12;
+  //     if (period === 'AM' && hour === 12) hour = 0;
+
+  //     const appointmentDate = new Date(selectedDate!);
+  //     appointmentDate.setHours(hour, parseInt(minutes), 0, 0);
+
+  //     // Check for conflicts
+  //     const { data: existingAppointments } = await supabase
+  //       .from('appointments')
+  //       .select('id')
+  //       .eq('doctor_id', doctorId)
+  //       .eq('appointment_date', appointmentDate.toISOString())
+  //       .neq('status', 'cancelled');
+
+  //     if (existingAppointments && existingAppointments.length > 0) {
+  //       alert('This time slot is already booked. Please select another time.');
+  //       setSelectedTime(null);
+  //       return;
+  //     }
+
+  //     // Insert appointment
+  //     const { error } = await supabase.from('appointments').insert({
+  //       doctor_id: doctorId,
+  //       patient_id: patient?.id,
+  //       appointment_date: appointmentDate.toISOString(),
+  //       status: 'scheduled',
+  //       reason: patientInfo.reason || null
+  //     });
+
+  //     if (error) throw error;
+
+  //     // Notifications on booking are disabled per user's request.
+  //     // Previously we attempted to create entries in the `notifications` table here,
+  //     // but that caused FK/RLS issues. To avoid inserting notifications on booking,
+  //     // we only log the intended notification (so it can be re-enabled later if needed).
+  //     // try {
+  //     //   console.log('Notification suppressed for booking:', {
+  //     //     from: patientInfo.name,
+  //     //     to: doctor?.full_name,
+  //     //     date: format(appointmentDate, 'MMM dd, yyyy'),
+  //     //     time: selectedTime,
+  //     //   });
+  //     // } catch (err) {
+  //     //   // keep booking flow robust even if logging fails
+  //     //   console.warn('Notification logging failed:', err);
+  //     // }
+
+  //      try {
+  //       await supabase.from('doctor_notifications').insert({
+  //         doctor_id: doctorId,
+  //         message: `New appointment from ${patientInfo.name} on ${format(
+  //           appointmentDate,
+  //           'MMM dd, yyyy'
+  //         )} at ${selectedTime}`
+  //       });
+  //     } catch (notificationError) {
+  //       // Don't fail the booking if notification fails
+  //       console.warn('Failed to create notification:', notificationError);
+  //     }
+
+  //     // NOTE: kept the old doctor_notifications insertion as a commented fallback
+  //     /*
+  //     await supabase.from('doctor_notifications').insert({
+  //       doctor_id: doctorId,
+  //       message: `New appointment from ${patientInfo.name} on ${format(
+  //         appointmentDate,
+  //         'MMM dd, yyyy'
+  //       )} at ${selectedTime}`
+  //     });
+  //     */
+
+  //     setStep(3);
+  //   } catch (error: any) {
+  //     console.error('Error booking appointment:', error);
+  //     alert(`Error: ${error.message || 'Please try again.'}`);
+  //   } finally {
+  //     setSubmitting(false);
+  //   }
+  // };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -656,6 +751,7 @@ const BookAppointment = () => {
             />
           </div>
         </div>
+        <Footer/>
       </div>
    
   );

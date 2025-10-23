@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { supabase } from '../lib/supabaseClient';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Award, Trash2 } from 'lucide-react';
 import { 
   Calendar, 
   Users, 
@@ -22,9 +26,160 @@ import {
   Search
 } from 'lucide-react';
 
+interface DoctorProfile {
+  id: string;
+  auth_id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  specialization: string;
+  qualification: string;
+  experience: number;
+  clinic_name: string;
+  consultation_fee: number | null;
+  location: string;
+  bio: string | null;
+  assistant_contact: string | null;
+  profile_photo: string | null;
+  available_slots?: AvailableSlot[];
+}
+
+interface AvailableSlot {
+  id: string;
+  doctor_id: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  is_available: boolean;
+}
+
 const DoctorDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
+  const [isEditingSlots, setIsEditingSlots] = useState(false);
+  const navigate = useNavigate();
+
+  // Fetch doctor profile data
+  useEffect(() => {
+    const fetchDoctorProfile = async () => {
+      try {
+        // Get current authenticated user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          navigate('/login');
+          return;
+        }
+
+        // Fetch doctor profile data (limit to 1 record to avoid errors when duplicates exist)
+        const { data: doctorData, error: doctorError } = await supabase
+          .from('doctors')
+          .select('*')
+          .eq('auth_id', user.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (doctorError) {
+          console.error('Error fetching doctor profile:', doctorError);
+          return;
+        }
+
+        // Fetch available slots for the doctor
+        if (doctorData?.id) {
+          const { data: slotsData, error: slotsError } = await supabase
+            .from('available_slots')
+            .select('*')
+            .eq('doctor_id', doctorData.id);
+
+          if (slotsError) {
+            console.error('Error fetching slots:', slotsError);
+          } else {
+            setAvailableSlots(slotsData || []);
+          }
+        }
+
+        setDoctor(doctorData);
+      } catch (error) {
+        console.error('Error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDoctorProfile();
+  }, [navigate]);
+
+  const updateAppointmentStatus = async (appointmentId: number, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: newStatus })
+        .eq('id', appointmentId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Refetch appointments or update local state
+      // You'll need to implement this based on how you're managing appointment state
+    } catch (error) {
+      console.error('Error updating appointment status:', error);
+      alert('Failed to update appointment status');
+    }
+  };
+
+  const updateAvailableSlots = async (slots: AvailableSlot[]) => {
+    if (!doctor?.id) return;
+    
+    try {
+      // Delete existing slots
+      await supabase
+        .from('available_slots')
+        .delete()
+        .eq('doctor_id', doctor.id);
+
+      // Insert new slots
+      const { error } = await supabase
+        .from('available_slots')
+        .insert(slots.map(slot => ({
+          ...slot,
+          doctor_id: doctor.id
+        })));
+
+      if (error) throw error;
+      
+      setAvailableSlots(slots);
+      setIsEditingSlots(false);
+      alert('Availability updated successfully!');
+    } catch (error) {
+      console.error('Error updating slots:', error);
+      alert('Failed to update availability');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (!doctor) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <p className="text-xl text-gray-600 mb-4">Doctor profile not found</p>
+        <button
+          onClick={() => navigate('/doctor_registration')}
+          className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+        >
+          Complete Registration
+        </button>
+      </div>
+    );
+  }
 
   const stats = [
     {
@@ -132,9 +287,16 @@ const DoctorDashboard = () => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: TrendingUp },
     { id: 'appointments', label: 'Appointments', icon: Calendar },
+    { id: 'availability', label: 'Update Slots', icon: Clock },
     { id: 'patients', label: 'Patients', icon: Users },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
+
+  // Available time slots for each day
+  const timeSlots = Array.from({ length: 24 }, (_, i) => {
+    const hour = i.toString().padStart(2, '0');
+    return `${hour}:00`;
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -173,37 +335,43 @@ const DoctorDashboard = () => {
         >
           <div className="flex flex-col lg:flex-row items-center lg:items-start space-y-6 lg:space-y-0 lg:space-x-8">
             <div className="relative">
-              <img
-                src="https://images.pexels.com/photos/5215024/pexels-photo-5215024.jpeg?auto=compress&cs=tinysrgb&w=150"
-                alt="Dr. Sarah Johnson"
-                className="w-24 h-24 rounded-full object-cover border-4 border-blue-200"
-              />
+              {doctor.profile_photo ? (
+                <img
+                  src={doctor.profile_photo}
+                  alt={doctor.full_name}
+                  className="w-24 h-24 rounded-full object-cover border-4 border-blue-200"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center border-4 border-blue-200">
+                  <User className="w-12 h-12 text-gray-400" />
+                </div>
+              )}
               <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-2">
                 <CheckCircle className="w-4 h-4 text-white" />
               </div>
             </div>
             
             <div className="text-center lg:text-left flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Dr. Sarah Johnson</h1>
-              <p className="text-blue-600 font-medium mb-2">Cardiologist</p>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Dr. {doctor.full_name}</h1>
+              <p className="text-blue-600 font-medium mb-2">{doctor.specialization}</p>
               <div className="flex flex-wrap justify-center lg:justify-start gap-4 mb-4">
                 <div className="flex items-center text-gray-600">
-                  <Star className="w-4 h-4 mr-1 text-yellow-400 fill-current" />
-                  4.9 (324 reviews)
+                  <Award className="w-4 h-4 mr-1 text-blue-500" />
+                  {doctor.qualification}
                 </div>
                 <div className="flex items-center text-gray-600">
                   <MapPin className="w-4 h-4 mr-1" />
-                  Mount Sinai Hospital
+                  {doctor.clinic_name}
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <div className="flex items-center text-gray-600">
                   <Mail className="w-4 h-4 mr-2" />
-                  dr.johnson@medicare.com
+                  {doctor.email}
                 </div>
                 <div className="flex items-center text-gray-600">
                   <Phone className="w-4 h-4 mr-2" />
-                  +1 (555) 123-4567
+                  {doctor.phone}
                 </div>
               </div>
             </div>
@@ -425,6 +593,117 @@ const DoctorDashboard = () => {
                           </div>
                         </div>
                       </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'availability' && (
+                <div className="bg-white rounded-2xl shadow-lg p-8">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900">Manage Availability</h2>
+                    {!isEditingSlots ? (
+                      <button
+                        onClick={() => setIsEditingSlots(true)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Edit Slots
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setIsEditingSlots(false)}
+                          className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => updateAvailableSlots(availableSlots)}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-6">
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                      <div key={day} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold">{day}</h3>
+                          {isEditingSlots && (
+                            <button
+                              onClick={() => {
+                                setAvailableSlots([
+                                  ...availableSlots,
+                                  {
+                                    id: crypto.randomUUID(),
+                                    doctor_id: doctor.id,
+                                    day_of_week: day,
+                                    start_time: '09:00',
+                                    end_time: '17:00',
+                                    is_available: true
+                                  }
+                                ]);
+                              }}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <Plus className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          {availableSlots
+                            .filter(slot => slot.day_of_week === day)
+                            .map((slot, index) => (
+                              <div key={index} className="flex items-center gap-4">
+                                <select
+                                  value={slot.start_time}
+                                  onChange={(e) => {
+                                    const newSlots = availableSlots.map(s =>
+                                      s.id === slot.id ? { ...s, start_time: e.target.value } : s
+                                    );
+                                    setAvailableSlots(newSlots);
+                                  }}
+                                  disabled={!isEditingSlots}
+                                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                                >
+                                  {timeSlots.map(time => (
+                                    <option key={time} value={time}>{time}</option>
+                                  ))}
+                                </select>
+                                <span>to</span>
+                                <select
+                                  value={slot.end_time}
+                                  onChange={(e) => {
+                                    const newSlots = availableSlots.map(s =>
+                                      s.id === slot.id ? { ...s, end_time: e.target.value } : s
+                                    );
+                                    setAvailableSlots(newSlots);
+                                  }}
+                                  disabled={!isEditingSlots}
+                                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                                >
+                                  {timeSlots.map(time => (
+                                    <option key={time} value={time}>{time}</option>
+                                  ))}
+                                </select>
+                                {isEditingSlots && (
+                                  <button
+                                    onClick={() => {
+                                      setAvailableSlots(availableSlots.filter(s => s.id !== slot.id));
+                                    }}
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    <Trash2 className="w-5 h-5" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
