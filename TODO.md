@@ -1,34 +1,28 @@
-# TODO: User Profile Restructuring and Symptom Management
+# TODO: Fix Doctor Registration and Login Issues
 
-## Overview
-Restructure UserProfile page to include:
-- Symptoms section with sidebar for short-term and long-term diseases
-- PDF upload/view functionality using jar.png icons
-- Chat history display for symptom checker
+## Issues
+1. Medical license and certificates not saved to storage buckets during doctor registration.
+2. Doctor registration email/password not saved in users table for authentication.
+3. Login not redirecting doctors to /doctor_selfprofile.
 
-## Database Setup
-- [ ] Verify/create chat_messages table in Supabase (columns: id, user_id, message_text, sender, timestamp)
-- [ ] Confirm patients table has short_term_disease and long_term_disease columns
-- [ ] Confirm storage buckets: short_term_diseases, long_term_diseases
+## Plan
+1. **Create users table** for custom authentication.
+2. **Install bcryptjs** for password hashing.
+3. **Modify DoctorRegistration.tsx**:
+   - Add password hashing and insert into users table.
+   - Add upload logic for medicalLicenseFile to 'medical_license' bucket.
+   - Add upload logic for medicalCertificatesFile to 'certificates' bucket.
+   - Update doctors insert to include medical_license and medical_certificates URLs.
+4. **Modify LoginPage.tsx**:
+   - Add logic to check users table first for authentication.
+   - If found, verify password and redirect based on role.
+   - Fallback to Supabase auth for patients.
+5. **Test** doctor registration and login.
 
-## Frontend Components
-- [ ] Add "Symptoms" tab to UserProfile sidebar
-- [ ] Create SymptomsSection component with left sidebar layout
-- [ ] Add short-term diseases section (cold, cough, viral fever, etc.)
-- [ ] Add long-term diseases section (skin disease, diabetes, etc.)
-- [ ] Integrate jar.png icons with edit/view functionality
-- [ ] Implement PDF upload to respective buckets
-- [ ] Create PDF viewer modal for viewing saved PDFs
-- [ ] Create ChatHistory component for center section
-- [ ] Update UserProfile layout to show chat history in center
-
-## Chat History Implementation
-- [ ] Modify Chatbot.tsx to save messages to chat_messages table
-- [ ] Update UserProfile to fetch and display chat history
-- [ ] Ensure chat history is filtered by user_id
- 
-## Testing
-- [ ] Test PDF upload functionality for both disease types
-- [ ] Test PDF view functionality with modal
-- [ ] Test chat history persistence and display
-- [ ] Test overall layout and responsiveness
+## Steps
+- [ ] Create users table in Supabase: id (uuid pk), email (text unique), password_hash (text), role (text), created_at (timestamp).
+- [ ] Install bcryptjs in react-frontend.
+- [ ] Update DoctorRegistration.tsx handleSubmitAsync.
+- [ ] Update LoginPage.tsx handleLogin.
+- [ ] Test registration: files uploaded, profile created, users inserted.
+- [ ] Test login: doctors redirect to /doctor_selfprofile.

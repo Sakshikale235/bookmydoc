@@ -321,6 +321,7 @@ import React, { useState } from "react";
 import "boxicons/css/boxicons.min.css";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import bcrypt from 'bcryptjs';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();

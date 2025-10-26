@@ -182,25 +182,50 @@ const DoctorRegistration = () => {
     }
   };
 
-  const handleSubmit = () => {
-    // noop - replaced by async handler below
-    return;
-  };
-
   const handleSubmitAsync = async () => {
     setUploading(true);
     try {
-      // ensure user signed in
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) {
-        alert('Please sign in before registering as a doctor.');
+      // Sign up with Supabase Auth (auto-confirm for development)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            auto_confirm: true
+          }
+        }
+      });
+
+      if (authError) {
+        console.error('Auth sign up error:', authError);
+        alert('Could not create user account. Please try again.');
+        return;
+      }
+
+      // Sign in to establish session for RLS
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (signInError) {
+        console.error('Auth sign in error:', signInError);
+        alert('Could not sign in after registration. Please try again.');
+        return;
+      }
+
+      const user = signInData.user;
+      if (!user) {
+        alert('User not found after sign in.');
         return;
       }
 
       let profilePhotoUrl: string | null = null;
+      let medicalLicenseUrl: string | null = null;
+      let medicalCertificatesUrl: string | null = null;
 
+      // Upload profile photo
       if (profilePhotoFile) {
-        // upload to 'profile-photos' bucket
         const ext = profilePhotoFile.name.split('.').pop();
         const fileName = `doctor_${user.id}_${Date.now()}.${ext}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -208,7 +233,7 @@ const DoctorRegistration = () => {
           .upload(fileName, profilePhotoFile, { upsert: false });
 
         if (uploadError) {
-          console.error('Upload error', uploadError);
+          console.error('Profile photo upload error', uploadError);
           alert('Failed to upload profile photo.');
         } else if (uploadData?.path) {
           const { data: publicUrlData } = supabase.storage
@@ -218,7 +243,45 @@ const DoctorRegistration = () => {
         }
       }
 
-      // build insert payload, include profile_photo only if available
+      // Upload medical license
+      if (medicalLicenseFile) {
+        const ext = medicalLicenseFile.name.split('.').pop();
+        const fileName = `license_${user.id}_${Date.now()}.${ext}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('medical_license')
+          .upload(fileName, medicalLicenseFile, { upsert: false });
+
+        if (uploadError) {
+          console.error('Medical license upload error', uploadError);
+          alert('Failed to upload medical license.');
+        } else if (uploadData?.path) {
+          const { data: publicUrlData } = supabase.storage
+            .from('medical_license')
+            .getPublicUrl(uploadData.path);
+          medicalLicenseUrl = publicUrlData.publicUrl || null;
+        }
+      }
+
+      // Upload medical certificates
+      if (medicalCertificatesFile) {
+        const ext = medicalCertificatesFile.name.split('.').pop();
+        const fileName = `certificates_${user.id}_${Date.now()}.${ext}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('certificates')
+          .upload(fileName, medicalCertificatesFile, { upsert: false });
+
+        if (uploadError) {
+          console.error('Medical certificates upload error', uploadError);
+          alert('Failed to upload medical certificates.');
+        } else if (uploadData?.path) {
+          const { data: publicUrlData } = supabase.storage
+            .from('certificates')
+            .getPublicUrl(uploadData.path);
+          medicalCertificatesUrl = publicUrlData.publicUrl || null;
+        }
+      }
+
+      // Build doctor insert payload
       const doctorData: any = {
         auth_id: user.id,
         full_name: formData.fullName,
@@ -236,7 +299,9 @@ const DoctorRegistration = () => {
         advance_notice: formData.advanceNotice || null,
         home_visits: formData.homeVisits,
         auto_confirm_appointments: formData.autoConfirm,
-        monthly_feedback_summaries: formData.feedbackSummary
+        monthly_feedback_summaries: formData.feedbackSummary,
+        medical_license: medicalLicenseUrl,
+        medical_certificates: medicalCertificatesUrl
       };
       if (profilePhotoUrl) doctorData.profile_photo = profilePhotoUrl;
 
@@ -245,7 +310,7 @@ const DoctorRegistration = () => {
 
       if (insertError) {
         console.error('Insert doctor error:', insertError);
-        alert('Could not save profile. Please try again.');
+        alert('Could not save doctor profile. Please try again.');
         return;
       }
 
@@ -256,11 +321,16 @@ const DoctorRegistration = () => {
     }
   };
 
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const isStepValid = (step: number) => {
     switch (step) {
       case 1:
-        return formData.fullName && formData.email && formData.password &&
-               formData.confirmPassword && formData.mobile &&
+        return formData.fullName && formData.email && isValidEmail(formData.email) &&
+               formData.password && formData.confirmPassword && formData.mobile &&
                formData.password === formData.confirmPassword;
       case 2:
         return formData.degrees.some(d => d.trim()) &&
