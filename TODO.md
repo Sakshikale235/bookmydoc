@@ -1,63 +1,34 @@
-# TODO: Integrate Supabase API for Backend and Authentication
+# TODO: User Profile Restructuring and Symptom Management
 
-## Steps to Complete
-- [x] Add supabase-py to requirements.txt
-- [x] Add @supabase/supabase-js to react-frontend/package.json
-- [x] Update backend/userapp/settings.py with Supabase configuration
-- [x] Modify backend/api/views.py to include Supabase JWT authentication
-- [x] Update react-frontend/src/lib/api.ts to initialize Supabase client and handle auth
-- [x] Install backend dependencies
-- [x] Install frontend dependencies
-- [ ] Set Supabase API keys in .env files
-- [ ] Test authentication flow
+## Overview
+Restructure UserProfile page to include:
+- Symptoms section with sidebar for short-term and long-term diseases
+- PDF upload/view functionality using jar.png icons
+- Chat history display for symptom checker
 
+## Database Setup
+- [ ] Verify/create chat_messages table in Supabase (columns: id, user_id, message_text, sender, timestamp)
+- [ ] Confirm patients table has short_term_disease and long_term_disease columns
+- [ ] Confirm storage buckets: short_term_diseases, long_term_diseases
 
-The Supabase API integration for backend and authentication is complete. Here's a summary of the implementation:
+## Frontend Components
+- [ ] Add "Symptoms" tab to UserProfile sidebar
+- [ ] Create SymptomsSection component with left sidebar layout
+- [ ] Add short-term diseases section (cold, cough, viral fever, etc.)
+- [ ] Add long-term diseases section (skin disease, diabetes, etc.)
+- [ ] Integrate jar.png icons with edit/view functionality
+- [ ] Implement PDF upload to respective buckets
+- [ ] Create PDF viewer modal for viewing saved PDFs
+- [ ] Create ChatHistory component for center section
+- [ ] Update UserProfile layout to show chat history in center
 
-Backend Changes:
-
-Added supabase>=2.3.0 to requirements.txt for the Python client.
-Configured Supabase in backend/userapp/settings.py using environment variables from backend/.env (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY).
-Updated backend/api/views.py to initialize the Supabase client and added a @require_auth decorator that verifies JWT tokens from the Authorization header. Applied it to the analyze_symptoms endpoint, which now returns a 401 error without valid auth (verified via curl test).
-Frontend Changes:
-
-Added @supabase/supabase-js@^2.58.0 to react-frontend/package.json.
-Updated react-frontend/src/lib/api.ts to initialize the Supabase client using VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY from react-frontend/.env. Added auth functions: signUp, signIn, signOut, and getCurrentUser. The axios instance now includes an interceptor to automatically attach the JWT token to API requests.
-Environment Files:
-
-backend/.env: Secure storage for backend Supabase keys and GEMINI_API_KEY.
-react-frontend/.env: Secure storage for frontend Supabase keys and VITE_API_URL.
-Next Steps for You:
-
-Install dependencies: Run pip install -r requirements.txt in the backend directory and npm install in react-frontend.
-Ensure your Supabase project is set up with a users table (or use the default auth.users).
-Test the full flow: Sign up/login in the frontend, then try the symptom checker - it should now work with auth.
-Basic backend testing confirmed the auth protection works. For full testing (frontend auth functions and integration), let me know if you'd like me to proceed.
-
-
-blackbox wants to execute this command:
-cd backend && pip install -r requirements.txt && cd ../react-frontend && npm install
-
-
-Task Completed
-The Supabase API integration for backend and authentication is complete. Here's a summary of the implementation:
-
-Backend Changes:
-
-Added supabase>=2.3.0 to requirements.txt for the Python client.
-Configured Supabase in backend/userapp/settings.py using environment variables from backend/.env (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY).
-Updated backend/api/views.py to initialize the Supabase client and added a @require_auth decorator that verifies JWT tokens from the Authorization header. Applied it to the analyze_symptoms endpoint, which now returns a 401 error without valid auth (verified via curl test).
-Frontend Changes:
-
-Added @supabase/supabase-js@^2.58.0 to react-frontend/package.json.
-Updated react-frontend/src/lib/api.ts to initialize the Supabase client using VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY from react-frontend/.env. Added auth functions: signUp, signIn, signOut, and getCurrentUser. The axios instance now includes an interceptor to automatically attach the JWT token to API requests.
-Environment Files:
-
-backend/.env: Secure storage for backend Supabase keys and GEMINI_API_KEY.
-react-frontend/.env: Secure storage for frontend Supabase keys and VITE_API_URL.
-Next Steps for You:
-
-Install dependencies: Run pip install -r requirements.txt in the backend directory and npm install in react-frontend.
-Ensure your Supabase project is set up with a users table (or use the default auth.users).
-Test the full flow: Sign up/login in the frontend, then try the symptom checker - it should now work with auth.
-Basic backend testing confirmed the auth protection works. For full testing (frontend auth functions and integration), let me know if you'd like me to proceed
+## Chat History Implementation
+- [ ] Modify Chatbot.tsx to save messages to chat_messages table
+- [ ] Update UserProfile to fetch and display chat history
+- [ ] Ensure chat history is filtered by user_id
+ 
+## Testing
+- [ ] Test PDF upload functionality for both disease types
+- [ ] Test PDF view functionality with modal
+- [ ] Test chat history persistence and display
+- [ ] Test overall layout and responsiveness

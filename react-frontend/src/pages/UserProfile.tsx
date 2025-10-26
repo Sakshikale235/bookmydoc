@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabaseClient";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+import bgimage from "@/assets/patient_reg.jpg"  ;
 import { useNavigate, Link } from "react-router-dom";
 import {
   User,
@@ -16,8 +17,10 @@ import {
   Clock,
   MapPin,
   Save,
-  X
+  X,
+  Activity
 } from "lucide-react";
+import SymptomsSection from "@/components/ui/SymptomsSection";
 
 interface PatientProfile {
   id?: number;
@@ -89,7 +92,8 @@ export default function UserProfile() {
   const tabs = [
     { id: 'profile', label: 'Profile Settings', icon: User },
     { id: 'appointments', label: 'My Appointments', icon: Calendar },
-    { id: 'notifications', label: 'Notifications', icon: Bell }
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'symptoms', label: 'Symptoms & History', icon: Activity }
   ];
 
 
@@ -345,7 +349,8 @@ export default function UserProfile() {
 
   return (
     
-    <div className="min-h-screen bg-gray-50 ">
+    <div className="min-h-screen bg-gray-50 "
+     style={{ backgroundImage: `url(${bgimage})` }}>
       {/* navbar */}
         <Navigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 lg:px-8">
@@ -780,6 +785,16 @@ export default function UserProfile() {
                       </label>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'symptoms' && (
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <Activity className="w-6 h-6 mr-3 text-blue-500" />
+                    Symptoms & History
+                  </h2>
+                  <SymptomsSection user={user} />
                 </div>
               )}
             </div>
