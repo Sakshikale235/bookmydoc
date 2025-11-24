@@ -67,6 +67,48 @@ def analyze_symptoms(request):
         user_lat = data.get("latitude", None)
         user_lng = data.get("longitude", None)
 
+        # -----------------------------
+        # Validate gender value
+        # -----------------------------
+        if gender:
+            valid_genders = {'male', 'female', 'trans'}
+            if gender.lower() not in valid_genders:
+                return None
+                # return JsonResponse({"error": f"Invalid gender value: {gender}. Valid values are: male, female, trans."}, status=400)
+
+        # -----------------------------
+        # Validate age
+        # -----------------------------
+        if age is not None:
+            try:
+                age_n = int(age)
+                if age_n <= 0 or age_n >= 120:
+                    return JsonResponse({"error": f"Invalid age value: {age}. Must be an integer >0 and <120."}, status=400)
+            except (ValueError, TypeError):
+                return JsonResponse({"error": f"Invalid age value: {age}. Must be an integer >0 and <120."}, status=400)
+
+        # -----------------------------
+        # Validate height
+        # -----------------------------
+        if height is not None:
+            try:
+                height_n = float(height)
+                if height_n <= 30 or height_n >= 300:
+                    return JsonResponse({"error": f"Invalid height value: {height}. Must be >30 and <300 (cm)."}, status=400)
+            except (ValueError, TypeError):
+                return JsonResponse({"error": f"Invalid height value: {height}. Must be >30 and <300 (cm)."}, status=400)
+
+        # -----------------------------
+        # Validate weight
+        # -----------------------------
+        if weight is not None:
+            try:
+                weight_n = float(weight)
+                if weight_n <= 2 or weight_n >= 600:
+                    return JsonResponse({"error": f"Invalid weight value: {weight}. Must be >2 and <600 (kg)."}, status=400)
+            except (ValueError, TypeError):
+                return JsonResponse({"error": f"Invalid weight value: {weight}. Must be >2 and <600 (kg)."}, status=400)
+
         if not symptoms:
             return JsonResponse({"error": "Please provide your symptoms"}, status=400)
 
@@ -98,24 +140,32 @@ Respond ONLY with valid JSON like:
 """
 
         # -----------------------------
-        # Call Gemini API (try multiple models)
+        # Call Gemini API (try dynamic list of supported models)
         # -----------------------------
-        model_names = [
-            "gemini-1.5-flash-latest",
-            "gemini-1.5-flash",
-            "gemini-2.0-flash-exp",
-            "gemini-1.5-pro-latest",
-            "gemini-1.5-pro"
-        ]
         response = None
         last_error = None
-        for model_name in model_names:
+        try:
+            # Get models supporting 'generateContent'
+            available_models = [
+                model.name for model in genai.list_models() 
+                if 'generateContent' in model.supported_generation_methods
+            ]
+        except Exception as e:
+            available_models = [
+                "gemini-1.5-flash-latest",
+                "gemini-1.5-flash",
+                "gemini-2.0-flash-exp"
+            ]  # Fallback list if list_models call fails
+
+        for model_name in available_models:
             try:
                 model = genai.GenerativeModel(model_name)
                 response = model.generate_content(prompt)
                 break
             except Exception as e:
                 last_error = str(e)
+                # Log the error for better debugging
+                print(f"Model {model_name} failed with error: {last_error}")
                 continue
 
         if response is None:

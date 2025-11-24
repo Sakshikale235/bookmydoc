@@ -358,7 +358,7 @@ const DoctorRegistration = () => {
           className="mb-8"
         >
           <Link
-            to="/profile"
+            to="/user_profile"
             className="inline-flex bg-white px-4 shadow-md py-2 items-center rounded-2xl text-blue-600 hover:shadow-lg hover:text-blue-800 mb-4 group transition-shadow duration-300"
           >
             <ArrowLeft className="w-5 h-5 mr-2  group-hover:-translate-x-1 transition-transform" />
