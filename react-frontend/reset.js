@@ -1,27 +1,27 @@
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
-  'https://ajtekovqiuatmefyoncu.supabase.co',           // e.g. https://abcd.supabase.co
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqdGVrb3ZxaXVhdG1lZnlvbmN1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODU2MzgyMiwiZXhwIjoyMDc0MTM5ODIyfQ.qA37obZaTFcEaTJWkoi_OKorL6jsrBpZNLfT3YRHRHQ'        // NOT anon key
+  'your supabase id',           // e.g. https://abcd.supabase.co
+  'your supabase service role key'        // NOT anon key
 )
 
-// async function resetPassword() {
-//   const { data, error } = await supabase.auth.admin.updateUserById(
-//     '6c3ee28b-eb0f-4498-88c1-454c9769ef14',  // your user id
-//     { password: 'riya@gdg' }             // your new password
-//   )
+async function resetPassword() {
+  const { data, error } = await supabase.auth.admin.updateUserById(
+    'UID',  // your user id
+    { password: 'password' }             // your new password
+  )
 
-//   console.log("DATA:", data)
-//   console.log("ERROR:", error)
-// }
+  console.log("DATA:", data)
+  console.log("ERROR:", error)
+}
 
-// resetPassword()
+resetPassword()
 
-const run = async () => {
-  const { data, error } = await supabase.auth.admin.deleteUser(
-    "6c3ee28b-eb0f-4498-88c1-454c9769ef14"
-  );
-  console.log("data:", data, "error:", error);
-};
+// const run = async () => {
+//   const { data, error } = await supabase.auth.admin.deleteUser(
+//     "UID"
+//   );
+//   console.log("data:", data, "error:", error);
+// };
 
-run();
+// run();

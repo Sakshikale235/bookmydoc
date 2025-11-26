@@ -234,9 +234,44 @@ Respond ONLY with valid JSON like:
                 print(f"Error fetching doctors: {e}")
                 doctors_list = []
 
-               # ...after building doctors_list and before returning...
+        # ...after building doctors_list and before returning...
         # reply_json["recommended_doctors"] = doctors_list
         reply_json["recommended_specialization"] = recommended_specialty  # <-- Add this line
+
+        # Insert symptom session record
+        try:
+            # Fetch patient_id by auth_id (request.user_id)
+            patient_resp = supabase.table("patients").select("id").eq("auth_id", request.user_id).maybe_single().execute()
+            patient_id = None
+            if patient_resp.data and "id" in patient_resp.data:
+                patient_id = patient_resp.data["id"]
+
+            if patient_id:
+                personal_info = {
+                    "age": age,
+                    "gender": gender,
+                    "height": height,
+                    "weight": weight
+                }
+                location_info = {
+                    "location": location,
+                    "latitude": user_lat,
+                    "longitude": user_lng
+                }
+                supabase.table("symptom_sessions").insert({
+                    "patient_id": patient_id,
+                    "started_at": datetime.utcnow().isoformat(),
+                    "ended_at": datetime.utcnow().isoformat(),
+                    "symptoms": symptoms.split(",") if isinstance(symptoms, str) else symptoms,
+                    "personal_info": personal_info,
+                    "location": location_info,
+                    "analysis_result": reply_json,
+                    "recommended_doctors": doctors_list,
+                    "created_at": datetime.utcnow().isoformat()
+                }).execute()
+        except Exception as e:
+            print(f"Failed to insert symptom session: {e}")
+
         return JsonResponse(reply_json, safe=False)
     
     
