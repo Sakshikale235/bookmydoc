@@ -23,7 +23,7 @@ import {
 import SymptomsSection from "@/components/ui/SymptomsSection";
 
 interface PatientProfile {
-  id?: number;
+  id?: string;
   auth_id: string;
   email: string;
   full_name: string;
