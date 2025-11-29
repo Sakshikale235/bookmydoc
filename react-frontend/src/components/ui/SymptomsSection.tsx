@@ -35,9 +35,6 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
     fetchMedicalHistory();
   }, [user]);
 
-  // -----------------------------
-  // Fetch PDFs from medical_history table
-  // -----------------------------
   const fetchMedicalHistory = async () => {
     if (!user?.id) return;
     const { data, error } = await supabase
@@ -64,9 +61,6 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
     );
   };
 
-  // -----------------------------
-  // Handle PDF upload
-  // -----------------------------
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
     type: 'short' | 'long'
@@ -85,21 +79,18 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
           continue;
         }
 
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}-${Date.now()}-${Math.random()}.${fileExt}`;
+        const fileName = file.name;
 
-        // Upload file to Supabase storage
         const { error: uploadError } = await supabase.storage
           .from(bucketName)
           .upload(fileName, file, { upsert: true });
+
         if (uploadError) throw uploadError;
 
-        // Get public URL
         const { data: publicUrlData } = supabase.storage
           .from(bucketName)
           .getPublicUrl(fileName);
 
-        // Insert into medical_history table
         await supabase.from("medical_history").insert([
           {
             patient_id: user.id,
@@ -122,21 +113,13 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
     }
   };
 
-  // -----------------------------
-  // Delete PDF
-  // -----------------------------
   const handleDeletePdf = async (id: string, url: string, type: 'short' | 'long') => {
     const bucketName = type === 'short' ? 'short_term_diseases' : 'long_term_diseases';
     const path = url.split("/storage/v1/object/public/")[1];
 
     try {
-      // Delete from storage
       await supabase.storage.from(bucketName).remove([path]);
-
-      // Delete from DB
       await supabase.from("medical_history").delete().eq("id", id);
-
-      // Refresh list
       fetchMedicalHistory();
     } catch (error) {
       console.error("Delete error:", error);
@@ -144,9 +127,6 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
     }
   };
 
-  // -----------------------------
-  // Render PDF list
-  // -----------------------------
   const renderPdfList = (pdfs: PdfEntry[], type: 'short' | 'long') => (
     <div className="mt-2 space-y-2">
       {pdfs.map((pdf) => (
@@ -160,7 +140,7 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
               View
             </button>
             <button
-              onClick={() => handleDeletePdf(pdf.id, pdf.url, type)}
+              onClick={() => { if (window.confirm('Are you sure you want to delete this file?')) handleDeletePdf(pdf.id, pdf.url, type); }}
               className="px-2 py-1 bg-red-600 text-white text-xs rounded"
             >
               Delete
@@ -184,12 +164,14 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
   return (
     <div className="flex h-full">
       <div className="w-80 bg-gray-50 p-6 border-r border-gray-200 overflow-y-auto">
+
         {/* Short-term Diseases */}
         <div className="mb-8">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
             <FileText className="w-5 h-5 mr-2 text-blue-600" />
             Short-term Diseases
           </h3>
+
           <div className="space-y-2 mb-4">
             {shortTermDiseases.map((disease) => (
               <div key={disease} className="text-sm text-gray-700 bg-white p-2 rounded-lg">
@@ -212,6 +194,7 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
               ref={shortTermInputRef}
               onChange={(e) => handleFileUpload(e, 'short')}
             />
+
             <button
               onClick={() => shortTermInputRef.current?.click()}
               disabled={uploading === 'short'}
@@ -231,6 +214,7 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
             <FileText className="w-5 h-5 mr-2 text-red-600" />
             Long-term Diseases
           </h3>
+
           <div className="space-y-2 mb-4">
             {longTermDiseases.map((disease) => (
               <div key={disease} className="text-sm text-gray-700 bg-white p-2 rounded-lg">
@@ -253,6 +237,7 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
               ref={longTermInputRef}
               onChange={(e) => handleFileUpload(e, 'long')}
             />
+
             <button
               onClick={() => longTermInputRef.current?.click()}
               disabled={uploading === 'long'}
@@ -267,7 +252,6 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Chat Section */}
       <div className="flex-1 p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Chat History with Health Assistant</h2>
         <div className="bg-white rounded-lg shadow-sm border p-6">
@@ -275,7 +259,6 @@ const SymptomsSection: React.FC<SymptomsSectionProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* PDF Viewer Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Medical Report" size="xl">
         {viewingPdf && (
           <iframe src={viewingPdf} className="w-full h-[80vh] border-0" title="PDF Viewer" />

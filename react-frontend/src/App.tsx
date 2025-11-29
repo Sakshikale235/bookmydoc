@@ -14,6 +14,7 @@ import DoctorRegistration from "./pages/DoctorRegistration";
 import DoctorSelfProfile from "./pages/DoctorSelfProfile";
 import BookAppointment from "./pages/BookAppointment";
 import ProtectedRoute from "./pages/ProtectedRoute"; // ✅ new
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,11 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+          <Route 
+            path="/reset-password" 
+            element={
+              <ResetPassword />} 
+              />
           <Route
             path="/user_profile"
             element={
