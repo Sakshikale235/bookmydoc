@@ -321,7 +321,6 @@ import React, { useState } from "react";
 import "boxicons/css/boxicons.min.css";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
-import bcrypt from 'bcryptjs';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -379,101 +378,128 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  // ✅ LOGIN
-// ...existing imports...
-// ...existing code...
-const handleLogin = async (e?: React.FormEvent) => {
-  if (e) e.preventDefault();
-  setLoading(true);
-  try {
-    const email = loginEmail.trim();
-    const password = loginPassword;
-    if (!email || !password) {
-      alert("Provide email & password");
-      setLoading(false);
-      return;
+  // ================================
+  //        ✅ FORGOT PASSWORD
+  // ================================
+  const handleForgotPassword = async () => {
+    const email = prompt("Enter your email to reset password:");
+    if (!email) return;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: "http://localhost:8080/reset-password",
+    });
+
+    if (error) {
+      alert("Error sending reset email: " + error.message);
+    } else {
+      alert("Password reset email sent! Check your inbox.");
     }
+  };
 
-    const res = await supabase.auth.signInWithPassword({ email, password });
-    console.log("signInWithPassword full result:", res);
+  // ================================
+  //              LOGIN
+  // ================================
+  const handleLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setLoading(true);
+    try {
+      const email = loginEmail.trim();
+      const password = loginPassword;
+      if (!email || !password) {
+        alert("Provide email & password");
+        setLoading(false);
+        return;
+      }
 
-    if (res.error) {
-      alert("Login failed: " + (res.error.message || JSON.stringify(res.error)));
-      setLoading(false);
-      return;
-    }
+      const res = await supabase.auth.signInWithPassword({ email, password });
+      console.log("signInWithPassword full result:", res);
 
-    const user = res.data?.user;
-    if (!user) {
-      alert("Login succeeded but no user returned.");
-      setLoading(false);
-      return;
-    }
+      if (res.error) {
+        alert("Login failed: " + (res.error.message || JSON.stringify(res.error)));
+        setLoading(false);
+        return;
+      }
 
-    // CHECK PATIENT FIRST (ensure patient users go to patient dashboard)
-    const patLookup = await supabase
-      .from("patients")
-      .select("id, auth_id, full_name")
-      .eq("auth_id", user.id)
-      .maybeSingle();
-    console.log("patient lookup:", patLookup);
+      const user = res.data?.user;
+      if (!user) {
+        alert("Login succeeded but no user returned.");
+        setLoading(false);
+        return;
+      }
 
-    if (patLookup.data && !patLookup.error) {
-      localStorage.setItem("role", "patient");
-      localStorage.setItem("isLoggedIn", "true");
-      navigate("/index");
-      setLoading(false);
-      return;
-    }
-
-    // THEN CHECK DOCTOR (existing logic with email fallback)
-    let docLookup = await supabase
-      .from("doctors")
-      .select("id, auth_id, email")
-      .eq("auth_id", user.id)
-      .maybeSingle();
-
-    console.log("doctor lookup by auth_id:", docLookup);
-
-    if ((!docLookup.data || docLookup.error) && user.email) {
-      const byEmail = await supabase
-        .from("doctors")
-        .select("id, auth_id, email")
-        .eq("email", user.email)
+      // CHECK PATIENT FIRST
+      const patLookup = await supabase
+        .from("patients")
+        .select("id, auth_id, full_name")
+        .eq("auth_id", user.id)
         .maybeSingle();
 
-      console.log("doctor lookup by email:", byEmail);
+      console.log("patient lookup:", patLookup);
 
-      if (byEmail.data && !byEmail.error) {
-        try {
-          await supabase.from("doctors").update({ auth_id: user.id }).eq("id", byEmail.data.id);
-          console.log("Updated doctors.auth_id for doctor id:", byEmail.data.id);
-          docLookup = { data: { ...byEmail.data, auth_id: user.id }, error: null };
-        } catch (upErr) {
-          console.warn("Failed to update doctors.auth_id:", upErr);
+      if (patLookup.data && !patLookup.error) {
+        localStorage.setItem("role", "patient");
+        localStorage.setItem("isLoggedIn", "true");
+        navigate("/index");
+        setLoading(false);
+        return;
+      }
+
+      // THEN CHECK DOCTOR (fallback to email)
+      const docLookup = await supabase
+        .from("doctors")
+        .select("id, auth_id, email")
+        .eq("auth_id", user.id)
+        .maybeSingle();
+
+      console.log("doctor lookup by auth_id:", docLookup);
+
+      if ((!docLookup.data || docLookup.error) && user.email) {
+        const byEmail = await supabase
+          .from("doctors")
+          .select("id, auth_id, email")
+          .eq("email", user.email)
+          .maybeSingle();
+
+        console.log("doctor lookup by email:", byEmail);
+
+        if (byEmail.data && !byEmail.error) {
+          try {
+            await supabase
+              .from("doctors")
+              .update({ auth_id: user.id })
+              .eq("id", byEmail.data.id);
+
+            console.log("Updated doctors.auth_id for doctor id:", byEmail.data.id);
+
+            // FIX: update response fields instead of replacing
+            docLookup.data = { ...byEmail.data, auth_id: user.id };
+            docLookup.error = null;
+          } catch (upErr) {
+            console.warn("Failed to update doctors.auth_id:", upErr);
+          }
         }
       }
-    }
 
-    if (docLookup.data && !docLookup.error) {
-      localStorage.setItem("role", "doctor");
-      localStorage.setItem("isLoggedIn", "true");
-      navigate("/doctor_selfprofile");
+      if (docLookup.data && !docLookup.error) {
+        localStorage.setItem("role", "doctor");
+        localStorage.setItem("isLoggedIn", "true");
+        navigate("/doctor_selfprofile");
+        setLoading(false);
+        return;
+      }
+
+      alert("Authenticated but not present in doctors or patients table.");
+    } catch (err) {
+      console.error("login exception:", err);
+      alert("Unexpected error - see console");
+    } finally {
       setLoading(false);
-      return;
     }
+  };
 
-    alert("Authenticated but not present in doctors or patients table.");
-  } catch (err) {
-    console.error("login exception:", err);
-    alert("Unexpected error - see console");
-  } finally {
-    setLoading(false);
-  }
-};
-// ...existing code...
-
-  // REGISTER
+  // ================================
+  //            REGISTER
+  // ================================
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -551,7 +577,9 @@ const handleLogin = async (e?: React.FormEvent) => {
     }
   };
 
-  // ================= STYLES =================
+  // ============================
+  //   STYLES (unchanged)
+  // ============================
   const globalStyles: React.CSSProperties = { margin: 0, padding: 0, boxSizing: "border-box", fontFamily: "Arial, sans-serif" };
   const bodyStyles: React.CSSProperties = { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "linear-gradient(90deg, #e2e2e2, #c9d6ff)", ...globalStyles };
   const containerStyles: React.CSSProperties = { position: "relative", width: "100%", maxWidth: "900px", height: "600px", background: "#fff", borderRadius: "30px", boxShadow: "0 0 30px rgba(0, 0, 0, 0.15)", margin: "20px", overflow: "hidden" };
@@ -565,7 +593,7 @@ const handleLogin = async (e?: React.FormEvent) => {
   const inputStyles: React.CSSProperties = { width: "100%", padding: "13px 50px 13px 20px", background: "#eee", borderRadius: "8px", border: "none", outline: "none", fontSize: "16px", color: "#333", fontWeight: 500 };
   const iconStyles: React.CSSProperties = { position: "absolute", right: "20px", top: "50%", transform: "translateY(-50%)", fontSize: "20px", color: "#333" };
   const forgotLinkStyles: React.CSSProperties = { margin: "-15px 0 15px" };
-  const forgotLinkAStyles: React.CSSProperties = { fontSize: "14.5px", color: "#2D9CDB", textDecoration: "none" };
+  const forgotLinkAStyles: React.CSSProperties = { fontSize: "14.5px", color: "#2D9CDB", textDecoration: "none", cursor: "pointer" };
   const btnStyles: React.CSSProperties = { width: "100%", height: "48px", backgroundColor: "#2D9CDB", boxShadow: "0 0 10px rgba(0,0,0,0.1)", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "16px", color: "#fff", fontWeight: 600 };
   const pStyles: React.CSSProperties = { fontSize: "14.5px", margin: "10px 0" };
   const socialIconsStyles: React.CSSProperties = { display: "flex", justifyContent: "center" };
@@ -594,10 +622,12 @@ const handleLogin = async (e?: React.FormEvent) => {
     <div style={bodyStyles}>
       <style dangerouslySetInnerHTML={{ __html: mediaQueries }} />
       <div style={containerStyles} className={`container ${isActive ? "active" : ""}`}>
+
         {/* Login form */}
         <div style={isActive ? formBoxActiveStyles : formBoxStyles} className="form-box">
           <form style={formStyles} onSubmit={handleLogin}>
             <h1 style={h1Styles}>Login</h1>
+
             <div style={inputBoxStyles}>
               <input
                 type="email"
@@ -610,6 +640,7 @@ const handleLogin = async (e?: React.FormEvent) => {
               />
               <i className="bx bxs-user" style={iconStyles}></i>
             </div>
+
             <div style={inputBoxStyles}>
               <input
                 type="password"
@@ -622,13 +653,19 @@ const handleLogin = async (e?: React.FormEvent) => {
               />
               <i className="bx bxs-lock-alt" style={iconStyles}></i>
             </div>
+
             <div style={forgotLinkStyles}>
-              <a href="#" style={forgotLinkAStyles}>Forgot password?</a>
+              <span onClick={handleForgotPassword} style={forgotLinkAStyles}>
+                Forgot password?
+              </span>
             </div>
+
             <button type="submit" style={btnStyles} disabled={loading}>
               {loading ? "Please wait..." : "Login"}
             </button>
+
             <p style={pStyles}>or login with social platforms</p>
+
             <div style={socialIconsStyles}>
               <a href="#" style={socialIconAStyles}><i className="bx bxl-google"></i></a>
               <a href="#" style={socialIconAStyles}><i className="bx bxl-facebook"></i></a>
@@ -642,32 +679,43 @@ const handleLogin = async (e?: React.FormEvent) => {
         <div style={isActive ? formBoxRegisterActiveStyles : formBoxRegisterStyles} className="form-box">
           <form style={formStyles} onSubmit={handleRegister}>
             <h1 style={h1Styles}>Register</h1>
+
             <div style={inputBoxStyles}>
               <input type="text" placeholder="Name" required style={inputStyles} value={regName} onChange={(e) => setRegName(e.target.value)} />
               <i className="bx bxs-user" style={iconStyles}></i>
             </div>
+
             <div style={inputBoxStyles}>
               <input type="tel" placeholder="Phone" required style={inputStyles} value={regPhone} onChange={(e) => setRegPhone(e.target.value)} />
               <i className="bx bxs-phone" style={iconStyles}></i>
             </div>
+
             <div style={inputBoxStyles}>
               <input type="email" placeholder="Email" required style={inputStyles} value={regEmail} onChange={(e) => setRegEmail(e.target.value)} />
               <i className="bx bxs-envelope" style={iconStyles}></i>
             </div>
+
             <div style={inputBoxStyles}>
               <input type="password" placeholder="Create Password" required style={inputStyles} value={regPassword} onChange={(e) => setRegPassword(e.target.value)} />
               <i className="bx bxs-lock-alt" style={iconStyles}></i>
             </div>
+
             <div style={checkboxStyles}>
               <input type="checkbox" id="terms" required style={checkboxInputStyles} checked={termsChecked} onChange={(e) => setTermsChecked(e.target.checked)} />
               <label htmlFor="terms" style={checkboxLabelStyles}>I agree to the <a href="#" style={linkStyles}>Terms of Service</a> and <a href="#" style={linkStyles}>Privacy Policy</a>.</label>
             </div>
+
             <div style={checkboxStyles}>
               <input type="checkbox" id="location" required style={checkboxInputStyles} checked={locationChecked} onChange={(e) => handleLocationAccess(e.target.checked)} />
               <label htmlFor="location" style={checkboxLabelStyles}>I allow this app to access my location for health insights.</label>
             </div>
-            <button type="submit" style={btnStyles} disabled={loading}>{loading ? "Please wait..." : "Register"}</button>
+
+            <button type="submit" style={btnStyles} disabled={loading}>
+              {loading ? "Please wait..." : "Register"}
+            </button>
+
             <p style={pStyles}>or Register with social platforms</p>
+
             <div style={socialIconsStyles}>
               <a href="#" style={socialIconAStyles}><i className="bx bxl-google"></i></a>
               <a href="#" style={socialIconAStyles}><i className="bx bxl-facebook"></i></a>
@@ -680,15 +728,29 @@ const handleLogin = async (e?: React.FormEvent) => {
         {/* Toggle section */}
         <div style={toggleBoxStyles} className="toggle-box">
           <div style={toggleBoxBeforeStyles} className="toggle-before"></div>
+
           <div style={toggleLeftStyles} className="toggle-panel toggle-left">
             <h1 style={h1Styles}>Hello, Welcome!</h1>
             <p style={togglePanelPStyles}>Don't have an account?</p>
-            <button type="button" style={toggleBtnStyles} onClick={() => setIsActive(true)}>Register</button>
+            <button
+              type="button"
+              style={toggleBtnStyles}
+              onClick={() => setIsActive(true)}
+            >
+              Register
+            </button>
           </div>
+
           <div style={toggleRightStyles} className="toggle-panel toggle-right">
             <h1 style={h1Styles}>Welcome Back!</h1>
             <p style={togglePanelPStyles}>Already have an account?</p>
-            <button type="button" style={toggleBtnStyles} onClick={() => setIsActive(false)}>Login</button>
+            <button
+              type="button"
+              style={toggleBtnStyles}
+              onClick={() => setIsActive(false)}
+            >
+              Login
+            </button>
           </div>
         </div>
       </div>

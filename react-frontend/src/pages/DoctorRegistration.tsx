@@ -96,7 +96,7 @@ const DoctorRegistration = () => {
     { id: 4, title: 'Additional Settings', icon: FileText }
   ];
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -105,30 +105,30 @@ const DoctorRegistration = () => {
 
   const handleArrayChange = (field: string, index: number, value: string) => {
     setFormData(prev => {
-      const arr = (prev as any)[field] as any[];
-      const newArr = arr.map((item: any, i: number) => (i === index ? value : item));
+      const arr = (prev[field as keyof DoctorFormData] as string[]);
+      const newArr = arr.map((item: string, i: number) => (i === index ? value : item));
       return {
         ...prev,
         [field]: newArr
-      } as unknown as DoctorFormData;
+      } as DoctorFormData;
     });
   };
 
   const addArrayItem = (field: string) => {
     setFormData(prev => ({
       ...prev,
-      [field]: [...prev[field as keyof DoctorFormData] as any[], '']
+      [field]: [...(prev[field as keyof DoctorFormData] as string[]), '']
     }));
   };
 
   const removeArrayItem = (field: string, index: number) => {
     setFormData(prev => ({
       ...prev,
-      [field]: (prev[field as keyof DoctorFormData] as any[]).filter((_, i) => i !== index)
+      [field]: (prev[field as keyof DoctorFormData] as string[]).filter((_, i) => i !== index)
     }));
   };
 
-  const handleClinicChange = (index: number, field: string, value: any) => {
+  const handleClinicChange = (index: number, field: string, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       clinics: prev.clinics.map((clinic, i) =>
@@ -282,7 +282,30 @@ const DoctorRegistration = () => {
       }
 
       // Build doctor insert payload
-      const doctorData: any = {
+      interface DoctorInsertData {
+        auth_id: string;
+        full_name: string;
+        email: string | null;
+        phone: string | null;
+        specialization: string;
+        qualification: string;
+        experience: number | null;
+        clinic_name: string | null;
+        consultation_fee: null;
+        location: string | null;
+        bio: string | null;
+        assistant_contact: string | null;
+        common_conditions: string[] | null;
+        advance_notice: string | null;
+        home_visits: boolean;
+        auto_confirm_appointments: boolean;
+        monthly_feedback_summaries: boolean;
+        medical_license: string | null;
+        medical_certificates: string | null;
+        profile_photo?: string;
+      }
+
+      const doctorData: DoctorInsertData = {
         auth_id: user.id,
         full_name: formData.fullName,
         email: formData.email || null,
