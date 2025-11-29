@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Send, Bot, User } from "lucide-react";
+import { Bot, User, Send } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
+import MessageList from "./chatbot/MessageList";
+import MessageInput from "./chatbot/MessageInput";
 
 type Message = {
   id: string;
@@ -26,100 +28,146 @@ type UserInfo = {
   longitude?: number | null;
 };
 
-const Chatbot: React.FC = () => {
+// Validation functions
+const validateAge = (v: string) => {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 && n < 120;
+};
+const validateHeight = (v: string) => {
+  const n = Number(v);
+  return !Number.isNaN(n) && n > 30 && n < 300;
+};
+const validateWeight = (v: string) => {
+  const n = Number(v);
+  return !Number.isNaN(n) && n > 2 && n < 600;
+};
+
+// Simple intent detection based on keywords
+type IntentResult = {
+  intent: "answer" | "edit" | "doctor_search" | "doctor_detail" | "emergency" | "summary" | "other";
+  target?: string;
+  value?: string;
+};
+
+function detectSimpleIntent(text: string): IntentResult {
+  const t = text.toLowerCase();
+  if (/^(change|edit|update)\b/.test(t)) {
+    const match = t.match(/\b(age|height|weight|gender|location|blood group)\b/);
+    const valueMatch = t.match(/to\s+(.+)$/);
+    return { intent: "edit", target: match?.[1], value: valueMatch?.[1]?.trim() };
+  }
+  if (/\b(show|find|list)\b.*\bdoctor\b/.test(t)) return { intent: "doctor_search" };
+  if (/^details?\s+of|show\s+dr|dr\./i.test(t)) return { intent: "doctor_detail" };
+  if (/\b(emergency|chest pain|shortness of breath|unconscious)\b/.test(t)) return { intent: "emergency" };
+  if (/\b(summary|recap|what.*said|tell.*again)\b/.test(t)) return { intent: "summary" };
+  return { intent: "answer" };
+}
+
+const Chatbot: React.FC<{}> = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const messageIdRef = useRef(1);
   const [patientDataFetched, setPatientDataFetched] = useState(false);
   const [dataConfirmed, setDataConfirmed] = useState(false);
   const [updatingField, setUpdatingField] = useState<string | null>(null);
 
-  const [step, setStep] = useState<number | 'doctor_suggestion'>(-1);
+  const [step, setStep] = useState<number | "doctor_suggestion">(-1);
   const [userInfo, setUserInfo] = useState<UserInfo>({});
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [lastAnalysisResult, setLastAnalysisResult] = useState<any>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
+
+  const navigate = useNavigate();
+
+  const pushMessage = (msg: Message) =>
+    setMessages((prev) => [...prev, msg]);
+
+  const getMessageId = () => (messageIdRef.current++).toString();
 
   useEffect(() => {
-    const fetchPatientData = async () => {
+    const fetchPatient = async () => {
       try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser) return;
+        const { data: authData } = await supabase.auth.getUser();
+        const authUser = (authData as any)?.user;
+        if (!authUser) {
+          pushMessage({
+            id: getMessageId(),
+            text: "Hello! Please sign in to use the symptom assistant.",
+            sender: "ai",
+            timestamp: new Date(),
+          });
+          setStep(0);
+          return;
+        }
 
-        const { data: patientData, error } = await supabase
+        const { data: patient } = await supabase
           .from("patients")
           .select("*")
           .eq("auth_id", authUser.id)
-          .single();
-
-        if (error) throw error;
-
-        if (patientData) {
+          .maybeSingle();
+        if (patient) {
           setUserInfo({
-            id: patientData.id,
-            auth_id: patientData.auth_id,
-            full_name: patientData.full_name,
-            age: patientData.age,
-            gender: patientData.gender,
-            height: patientData.height,
-            weight: patientData.weight,
-            blood_group: patientData.blood_group,
-            address: patientData.address,
-            location: patientData.address
+            id: patient.id,
+            auth_id: patient.auth_id,
+            full_name: patient.full_name,
+            age: patient.age,
+            gender: patient.gender,
+            height: patient.height,
+            weight: patient.weight,
+            blood_group: patient.blood_group,
+            address: patient.address,
+            location: patient.address,
           });
           setPatientDataFetched(true);
-
-          setMessages([{
+          pushMessage({
             id: getMessageId(),
-            text: `Hello ${patientData.full_name}! I have your health information. Let me confirm if these details are correct:\n\n` +
-                  `Age: ${patientData.age || 'Not provided'}\n` +
-                  `Gender: ${patientData.gender || 'Not provided'}\n` +
-                  `Height: ${patientData.height ? patientData.height + ' cm' : 'Not provided'}\n` +
-                  `Weight: ${patientData.weight ? patientData.weight + ' kg' : 'Not provided'}\n` +
-                  `Blood Group: ${patientData.blood_group || 'Not provided'}\n` +
-                  `Address: ${patientData.address || 'Not provided'}\n\n` +
-                  `Are these details correct? Please reply with 'yes' or 'no'.`,
+            text: `Hello ${patient.full_name || ""}! I have your saved details. Are these correct? Reply 'yes' or 'no'.\n\nAge: ${patient.age ?? "Not provided"}\nGender: ${patient.gender ?? "Not provided"}\nHeight: ${
+              patient.height ? patient.height + " cm" : "Not provided"
+            }\nWeight: ${patient.weight ? patient.weight + " kg" : "Not provided"}\nBlood Group: ${
+              patient.blood_group ?? "Not provided"
+            }\nAddress: ${patient.address ?? "Not provided"}`,
             sender: "ai",
             timestamp: new Date(),
-          }]);
+          });
+        } else {
+          pushMessage({
+            id: getMessageId(),
+            text: "Hello! I can help analyze symptoms. To begin, please tell me your age.",
+            sender: "ai",
+            timestamp: new Date(),
+          });
+          setStep(0);
         }
-      } catch (error) {
-        setMessages([{
+      } catch (e) {
+        pushMessage({
           id: getMessageId(),
-          text: "Hello! Welcome to your AI health assistant. I'm here to help analyze your symptoms and provide guidance. To get started, please say 'Hi' or 'Hello'.",
+          text: "Hello! I can help analyze symptoms. To begin, please tell me your age.",
           sender: "ai",
           timestamp: new Date(),
-        }]);
+        });
+        setStep(0);
       }
     };
-
-    fetchPatientData();
+    fetchPatient();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+  }, [messages, isTyping]);
 
   const steps = [
     "What is your age?",
-    "What is your gender?",
+    "What is your gender? (male/female/trans)",
     "Height in cm?",
     "Weight in kg?",
-    "Your location (city)? ",
-    "Please describe your symptoms *. Be as specific as possible.",
+    "Your location (city)?",
+    "Please describe your symptoms in detail.",
   ];
 
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [messages, isTyping]);
-
-  const pushMessage = (msg: Message) => setMessages((p) => [...p, msg]);
-  const getMessageId = () => {
-    return (messageIdRef.current++).toString();
-  };
-
-  const handleNext = async (value: string) => {
-    const userResponse = value.toLowerCase().trim();
-
+  const handleNext = async (raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
     pushMessage({
       id: getMessageId(),
       text: value,
@@ -127,149 +175,181 @@ const Chatbot: React.FC = () => {
       timestamp: new Date(),
     });
 
+    const vLower = value.toLowerCase();
+
+    // Detect intent for natural language commands
+    const intent = detectSimpleIntent(value);
+
+    // Intent-based commands handling
+    if (intent.intent === "edit" && intent.target && intent.value) {
+      await handleEditIntent(intent.target, intent.value);
+      setInputText("");
+      return;
+    } else if (intent.intent === "doctor_search") {
+      handleDoctorSearchIntent();
+      setInputText("");
+      return;
+    } else if (intent.intent === "doctor_detail") {
+      handleDoctorDetailIntent(value);
+      setInputText("");
+      return;
+    } else if (intent.intent === "emergency") {
+      handleEmergencyIntent();
+      setInputText("");
+      return;
+    } else if (intent.intent === "summary") {
+      handleSummaryIntent();
+      setInputText("");
+      return;
+    }
+
     if (patientDataFetched && !dataConfirmed) {
-      if (userResponse === 'yes') {
+      if (vLower === "yes") {
         setDataConfirmed(true);
         pushMessage({
-          id: Date.now().toString(),
+          id: getMessageId(),
           text: "Great! Please describe your symptoms in detail so I can help you find the right specialist.",
           sender: "ai",
           timestamp: new Date(),
         });
         setStep(5);
-      } else if (userResponse === 'no') {
+        setInputText("");
+        return;
+      }
+      if (vLower === "no") {
         pushMessage({
-          id: Date.now().toString(),
-          text: "Which information needs to be updated? Please specify the field (age/gender/height/weight/blood group).",
+          id: getMessageId(),
+          text: "Which information needs to be updated? Please specify the field (age/gender/height/weight/blood group/address).",
           sender: "ai",
           timestamp: new Date(),
         });
-        setUpdatingField('waiting_for_field');
-      } else if (updatingField === 'waiting_for_field') {
-        const field = userResponse;
-        let validField = true;
+        setUpdatingField("select");
+        setInputText("");
+        return;
+      }
+      if (updatingField === "select") {
+        const allowed = ["age", "gender", "height", "weight", "blood group", "address", "location"];
+        if (!allowed.includes(vLower)) {
+          pushMessage({
+            id: getMessageId(),
+            text: "Please choose one of: age, gender, height, weight, blood group, address, location",
+            sender: "ai",
+            timestamp: new Date(),
+          });
+          setInputText("");
+          return;
+        }
+        setUpdatingField(vLower);
+        pushMessage({
+          id: getMessageId(),
+          text: `Please provide the new value for ${vLower}:`,
+          sender: "ai",
+          timestamp: new Date(),
+        });
+        setInputText("");
+        return;
+      }
+      if (updatingField && updatingField !== "select") {
+        const field = updatingField;
+        let ok = true;
+        let msg = "";
+        const updateData: Partial<UserInfo> = {};
         switch (field) {
-          case 'age':
-          case 'gender':
-          case 'height':
-          case 'weight':
-          case 'blood group':
-          case 'address':
-            setUpdatingField(field);
-            pushMessage({
-              id: Date.now().toString(),
-              text: `Please enter your new ${field}:`,
-              sender: "ai",
-              timestamp: new Date(),
-            });
+          case "age":
+            if (!validateAge(value)) {
+              ok = false;
+              msg = "That doesn't look like a valid age. Please enter valid age (1-119).";
+            } else updateData.age = parseInt(value);
+            break;
+          case "gender":
+            if (!["male", "female", "trans"].includes(vLower)) {
+              ok = false;
+              msg = "That doesn't look like a valid gender. Please enter male, female, or trans.";
+            } else updateData.gender = value;
+            break;
+          case "height":
+            if (!validateHeight(value)) {
+              ok = false;
+              msg = "That doesn't look like a valid height. Please enter height in cm (30-300).";
+            } else updateData.height = parseFloat(value);
+            break;
+          case "weight":
+            if (!validateWeight(value)) {
+              ok = false;
+              msg = "That doesn't look like a valid weight. Please enter weight in kg (2-600).";
+            } else updateData.weight = parseFloat(value);
+            break;
+          case "blood group":
+            if (!["a+", "a-", "b+", "b-", "ab+", "ab-", "o+", "o-"].includes(vLower)) {
+              ok = false;
+              msg = "That doesn't look like a valid blood group. Please enter valid blood group (e.g., A+).";
+            } else updateData.blood_group = value;
+            break;
+          case "address":
+          case "location":
+            if (value.length < 3) {
+              ok = false;
+              msg = "Please enter a valid address or location.";
+            } else {
+              updateData.address = value;
+              updateData.location = value;
+            }
             break;
           default:
-            validField = false;
-            pushMessage({
-              id: Date.now().toString(),
-              text: "Please specify a valid field (age/gender/height/weight/blood group/address):",
-              sender: "ai",
-              timestamp: new Date(),
-            });
+            ok = false;
         }
-        if (!validField) return;
-      } else if (updatingField) {
-        const updateData: Partial<UserInfo> = {};
-        const newValue = userResponse;
-
-        switch (updatingField) {
-          case 'age':
-            updateData.age = parseInt(newValue) || null;
-            break;
-          case 'gender':
-            updateData.gender = newValue;
-            break;
-          case 'height':
-            updateData.height = parseFloat(newValue) || null;
-            break;
-          case 'weight':
-            updateData.weight = parseFloat(newValue) || null;
-            break;
-          case 'blood group':
-            updateData.blood_group = newValue;
-            break;
-          case 'address':
-            updateData.address = newValue;
-            break;
+        if (!ok) {
+          pushMessage({
+            id: getMessageId(),
+            text: msg,
+            sender: "ai",
+            timestamp: new Date(),
+          });
+          setInputText("");
+          return;
         }
-
         if (userInfo.id) {
           try {
-            const { error } = await supabase
-              .from("patients")
-              .update(updateData)
-              .eq("id", userInfo.id);
-
+            const { error } = await supabase.from("patients").update(updateData).eq("id", userInfo.id);
             if (error) throw error;
-
-            setUserInfo(prev => ({ ...prev, ...updateData }));
+            setUserInfo((prev) => ({ ...prev, ...updateData }));
             pushMessage({
-              id: Date.now().toString(),
-              text: `${updatingField} updated successfully. Are all other details correct now? (yes/no)`,
+              id: getMessageId(),
+              text: `${field} updated. Are all other details correct now? (yes/no)`,
               sender: "ai",
               timestamp: new Date(),
             });
             setUpdatingField(null);
-          } catch (error) {
+            setInputText("");
+            return;
+          } catch (e) {
             pushMessage({
-              id: Date.now().toString(),
-              text: "There was an error updating your information. Please try again.",
+              id: getMessageId(),
+              text: "Failed to update — please try again later.",
               sender: "ai",
               timestamp: new Date(),
             });
+            setInputText("");
+            return;
           }
         }
-        return;
       }
-      setInputText("");
-      return;
     }
 
-    if (step === 'doctor_suggestion') {
-      if (userResponse === "yes") {
-        let specialization =
-          lastAnalysisResult?.recommended_specialization ||
-          lastAnalysisResult?.specialization ||
-          "General Physician";
-        if (lastAnalysisResult?.recommended_doctors?.length) {
-          let doctorText = "👨‍⚕️ **Here are some recommended doctors nearby:**\n\n";
-          lastAnalysisResult.recommended_doctors.forEach((doc: any) => {
-            doctorText += `• **Dr. ${doc.full_name}**\n`;
-            if (doc.clinic_name) doctorText += `  🏥 ${doc.clinic_name}\n`;
-            if (doc.experience) doctorText += `  📚 ${doc.experience} years\n`;
-            if (doc.consultation_fee) doctorText += `  💰 Fee: ₹${doc.consultation_fee}\n`;
-            if (doc.phone) doctorText += `  📞 ${doc.phone}\n\n`;
-          });
-          pushMessage({
-            id: "ai-doctor-prompt",
-            text: `Would you like to see nearby ${specialization} doctors?`,
-            sender: "ai",
-            timestamp: new Date(),
-          });
-        } else {
-          pushMessage({
-            id: "ai-no-doctors",
-            text: "I couldn't find any specialists nearby. Please consider consulting a general physician.",
-            sender: "ai",
-            timestamp: new Date(),
-          });
-        }
-      } else if (userResponse === "no") {
+    if (step === "doctor_suggestion") {
+      if (vLower === "yes") {
+        handleNearbyDoctors();
+      } else if (vLower === "no") {
         pushMessage({
-          id: "ai-goodbye",
-          text: "Alright! If you need any other assistance, feel free to ask. Take care!",
+          id: getMessageId(),
+          text: "Okay — if you need anything else, feel free to ask anytime.",
           sender: "ai",
           timestamp: new Date(),
         });
       } else {
         pushMessage({
-          id: "ai-invalid",
-          text: "Please reply with 'yes' or 'no'.",
+          id: getMessageId(),
+          text: "Please reply 'yes' or 'no'.",
           sender: "ai",
           timestamp: new Date(),
         });
@@ -278,44 +358,95 @@ const Chatbot: React.FC = () => {
       return;
     }
 
-    if (!dataConfirmed) return;
-
-    const val = value.trim() || "*";
-    if (typeof step === 'number') {
+    if (typeof step === "number" && step >= 0) {
+      let isValid = true;
+      let errMsg = "";
       switch (step) {
         case 0:
-          setUserInfo((p) => ({ ...p, age: parseInt(val) || null }));
+          if (!validateAge(value)) {
+            isValid = false;
+            errMsg = "That doesn't look like a valid age. Please enter age between 1 and 119.";
+          }
           break;
         case 1:
-          setUserInfo((p) => ({ ...p, gender: val }));
+          if (!["male", "female", "trans"].includes(vLower)) {
+            isValid = false;
+            errMsg = "That doesn't look like a valid gender. Please enter male, female, or trans.";
+          }
           break;
         case 2:
-          setUserInfo((p) => ({ ...p, height: parseFloat(val) || null }));
+          if (!validateHeight(value)) {
+            isValid = false;
+            errMsg = "That doesn't look like a valid height. Please enter height in cm (30-300).";
+          }
           break;
         case 3:
-          setUserInfo((p) => ({ ...p, weight: parseFloat(val) || null }));
+          if (!validateWeight(value)) {
+            isValid = false;
+            errMsg = "That doesn't look like a valid weight. Please enter weight in kg (2-600).";
+          }
           break;
         case 4:
-          setUserInfo((p) => ({ ...p, location: val }));
+          if (value.length < 2) {
+            isValid = false;
+            errMsg = "Please enter valid location.";
+          }
           break;
         case 5:
-          setUserInfo((p) => ({ ...p, symptoms: val }));
+          if (value.length < 5) {
+            isValid = false;
+            errMsg = "Describe symptoms with at least 5 characters.";
+          }
           break;
       }
+      if (!isValid) {
+        pushMessage({
+          id: getMessageId(),
+          text: errMsg,
+          sender: "ai",
+          timestamp: new Date(),
+        });
+        setInputText("");
+        return;
+      }
+      if (step === 0) setUserInfo((p) => ({ ...p, age: parseInt(value) }));
+      if (step === 1) setUserInfo((p) => ({ ...p, gender: value }));
+      if (step === 2) setUserInfo((p) => ({ ...p, height: parseFloat(value) }));
+      if (step === 3) setUserInfo((p) => ({ ...p, weight: parseFloat(value) }));
+      if (step === 4) setUserInfo((p) => ({ ...p, location: value }));
+      if (step === 5) setUserInfo((p) => ({ ...p, symptoms: value }));
+
+      if (step < steps.length - 1) {
+        const next = step + 1;
+        setStep(next);
+        pushMessage({
+          id: getMessageId(),
+          text: steps[next],
+          sender: "ai",
+          timestamp: new Date(),
+        });
+      } else {
+        await sendToBackend({ ...userInfo, symptoms: value });
+      }
+      setInputText("");
+      return;
     }
 
-    if (step < steps.length - 1) {
-      setStep(step + 1);
-      pushMessage({
-        id: (Date.now() + 1).toString(),
-        text: steps[step + 1],
-        sender: "ai",
-        timestamp: new Date(),
-      });
-    } else {
-      sendToBackend({ ...userInfo, symptoms: val });
+    // If no recognized step, prompt starting conversation
+    if (step === -1) {
+      setStep(0);
+      pushMessage({ id: getMessageId(), text: steps[0], sender: "ai", timestamp: new Date() });
+      setInputText("");
+      return;
     }
 
+    // Fallback response
+    pushMessage({
+      id: getMessageId(),
+      text: "I'm sorry, I didn't understand that. Could you please rephrase or provide more details?",
+      sender: "ai",
+      timestamp: new Date(),
+    });
     setInputText("");
   };
 
@@ -423,15 +554,210 @@ const Chatbot: React.FC = () => {
     }
   };
 
-  const navigate = useNavigate();
+  const handleEditIntent = async (target: string, value: string) => {
+    if (!userInfo.id) {
+      pushMessage({
+        id: getMessageId(),
+        text: "I need to know your information first. Please start by saying 'Hi' or 'Hello'.",
+        sender: "ai",
+        timestamp: new Date(),
+      });
+      return;
+    }
 
-  function handleNearbyDoctors() {
+    let updateData: Partial<UserInfo> = {};
+
+    switch (target) {
+      case "age":
+        if (!validateAge(value)) {
+          pushMessage({
+            id: getMessageId(),
+            text: "That doesn't look like a valid age. Please enter a number between 1 and 100.",
+            sender: "ai",
+            timestamp: new Date(),
+          });
+          return;
+        }
+        updateData.age = parseInt(value);
+        break;
+      case "gender":
+        if (!["male", "female", "trans"].includes(value.toLowerCase())) {
+          pushMessage({
+            id: getMessageId(),
+            text: "That doesn't look like a valid gender. Please enter male, female, or trans.",
+            sender: "ai",
+            timestamp: new Date(),
+          });
+          return;
+        }
+        updateData.gender = value;
+        break;
+      case "height":
+        if (!validateHeight(value)) {
+          pushMessage({
+            id: getMessageId(),
+            text: "That doesn't look like a valid height. Please enter a number in cm between 30 and 300.",
+            sender: "ai",
+            timestamp: new Date(),
+          });
+          return;
+        }
+        updateData.height = parseFloat(value);
+        break;
+      case "weight":
+        if (!validateWeight(value)) {
+          pushMessage({
+            id: getMessageId(),
+            text: "That doesn't look like a valid weight. Please enter a number in kg between 2 and 600.",
+            sender: "ai",
+            timestamp: new Date(),
+          });
+          return;
+        }
+        updateData.weight = parseFloat(value);
+        break;
+      case "location":
+        updateData.location = value;
+        updateData.address = value;
+        break;
+      case "blood group":
+        const validBloodGroups = ["a+", "a-", "b+", "b-", "ab+", "ab-", "o+", "o-"];
+        if (!validBloodGroups.includes(value.toLowerCase())) {
+          pushMessage({
+            id: getMessageId(),
+            text: "That doesn't look like a valid blood group. Please enter one of: A+, A-, B+, B-, AB+, AB-, O+, O-.",
+            sender: "ai",
+            timestamp: new Date(),
+          });
+          return;
+        }
+        updateData.blood_group = value;
+        break;
+      default:
+        pushMessage({
+          id: getMessageId(),
+          text: "I can help you update: age, height, weight, gender, blood group, or location. Please specify which one you'd like to change.",
+          sender: "ai",
+          timestamp: new Date(),
+        });
+        return;
+    }
+
+    try {
+      const { error } = await supabase.from("patients").update(updateData).eq("id", userInfo.id);
+      if (error) throw error;
+      setUserInfo((prev) => ({ ...prev, ...updateData }));
+      pushMessage({
+        id: getMessageId(),
+        text: `✅ Your ${target} has been updated to ${value}.`,
+        sender: "ai",
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      pushMessage({
+        id: getMessageId(),
+        text: "There was an error updating your information. Please try again.",
+        sender: "ai",
+        timestamp: new Date(),
+      });
+    }
+  };
+
+  const handleDoctorSearchIntent = () => {
     const specialization =
       lastAnalysisResult?.recommended_specialization ||
       lastAnalysisResult?.specialization ||
       "General Physician";
     navigate(`/doctor_consultation?specialization=${encodeURIComponent(specialization)}`);
+  };
+
+  const handleDoctorDetailIntent = (text: string) => {
+    const doctorMatch = text.match(/(?:dr\.?\s*|doctor\s+)(.+)/i);
+    if (doctorMatch) {
+      const doctorName = doctorMatch[1].trim();
+      pushMessage({
+        id: getMessageId(),
+        text: `I'll help you find details about Dr. ${doctorName}. Let me search for them.`,
+        sender: "ai",
+        timestamp: new Date(),
+      });
+      navigate(`/doctor_consultation?search=${encodeURIComponent(doctorName)}`);
+    } else {
+      pushMessage({
+        id: getMessageId(),
+        text: "Please specify the doctor's name you'd like details for (e.g., 'show Dr. Smith').",
+        sender: "ai",
+        timestamp: new Date(),
+      });
+    }
+  };
+
+  const handleEmergencyIntent = () => {
+    pushMessage({
+      id: getMessageId(),
+      text: "🚨 **EMERGENCY ALERT!**\n\nThis appears to be a medical emergency. Please:\n\n1. **Call emergency services immediately** (911 or local emergency number)\n2. Stay calm and follow their instructions\n3. If possible, provide your location\n\n**Do not wait - seek immediate medical attention!**\n\nIf this is not an emergency, please describe your symptoms normally.",
+      sender: "ai",
+      timestamp: new Date(),
+    });
+  };
+
+  const handleSummaryIntent = () => {
+    let summaryText = "📋 **Conversation Summary:**\n\n";
+
+    // User info summary
+    summaryText += "**Your Information:**\n";
+    summaryText += `• Age: ${userInfo.age || "Not provided"}\n`;
+    summaryText += `• Gender: ${userInfo.gender || "Not provided"}\n`;
+    summaryText += `• Height: ${userInfo.height ? userInfo.height + " cm" : "Not provided"}\n`;
+    summaryText += `• Weight: ${userInfo.weight ? userInfo.weight + " kg" : "Not provided"}\n`;
+    summaryText += `• Location: ${userInfo.location || "Not provided"}\n\n`;
+
+    // Last analysis summary
+    if (lastAnalysisResult) {
+      summaryText += "**Last Symptom Analysis:**\n";
+      if (lastAnalysisResult.possible_diseases) {
+        summaryText += `• Possible Conditions: ${lastAnalysisResult.possible_diseases.join(", ")}\n`;
+      }
+      if (lastAnalysisResult.severity) {
+        summaryText += `• Severity: ${lastAnalysisResult.severity}\n`;
+      }
+      if (lastAnalysisResult.advice) {
+        summaryText += `• Advice: ${lastAnalysisResult.advice}\n`;
+      }
+      if (lastAnalysisResult.recommended_doctors && lastAnalysisResult.recommended_doctors.length > 0) {
+        summaryText += `• Recommended Doctors: ${lastAnalysisResult.recommended_doctors.length} found\n`;
+      }
+    } else {
+      summaryText += "No symptom analysis performed yet.\n";
+    }
+
+    pushMessage({
+      id: getMessageId(),
+      text: summaryText,
+      sender: "ai",
+      timestamp: new Date(),
+    });
+  };
+
+const handleNearbyDoctors = () => {
+  let specialization =
+    lastAnalysisResult?.recommended_specialization ||
+    lastAnalysisResult?.specialization ||
+    "General Physician";
+
+  // Keep only the first specialization segment before any comma, "and", or parentheses
+  if (specialization.includes("(")) {
+    specialization = specialization.split("(")[0].trim();
   }
+  if (specialization.includes(" and ")) {
+    specialization = specialization.split(" and ")[0].trim();
+  }
+  if (specialization.includes(",")) {
+    specialization = specialization.split(",")[0].trim();
+  }
+
+  navigate(`/doctor_consultation?specialization=${encodeURIComponent(specialization)}`);
+};
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -444,71 +770,10 @@ const Chatbot: React.FC = () => {
     <div className="h-screen bg-gray-190 flex items-center justify-center p-6 m-(-5)">
       <div className="w-full max-w-5xl bg-blue-100 rounded-2xl shadow-lg overflow-hidden flex flex-col">
         <div
-          ref={chatContainerRef}
+          ref={chatRef}
           className="flex-1 overflow-y-auto p-6 space-y-4 bg-blue-gradient max-h-96"
         >
-          {messages.map((message) => (
-            <div key={message.id} className="flex flex-col">
-              <div
-                className={`flex items-start space-x-3 ${message.sender === "user" ? "justify-end" : "justify-start"
-                  }`}
-              >
-                {message.sender === "ai" && (
-                  <div className="bg-white rounded-full p-2 flex-shrink-0">
-                    <Bot className="h-4 w-4 text-blue-600" />
-                  </div>
-                )}
-                <div
-                  className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl ${message.sender === "user"
-                    ? "bg-white text-gray-800 rounded-br-sm"
-                    : "bg-white text-gray-800 shadow-md rounded-bl-sm"
-                    }`}
-                >
-                  <div
-                    className="text-sm whitespace-pre-line"
-                    dangerouslySetInnerHTML={{ __html: message.text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>") }}
-                  ></div>
-
-                  {message.sender === "ai" &&
-                    typeof step === 'number' &&
-                    typeof step === 'number' && step >= 0 &&
-                    message.text.includes("* skip") && (
-                      <button
-                        onClick={() => handleNext("*")}
-                        className="self-start mt-2 ml-12 px-3 py-1 bg-gray-300 rounded-md text-sm hover:bg-gray-400 transition-colors"
-                      >
-                        Skip
-                      </button>
-                    )}
-
-                  {message.sender === "ai" && message.id === "ai-doctor-prompt" && (
-                    <button
-                      onClick={() => handleNearbyDoctors()}
-                      className="self-start mt-2 ml-12 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all"
-                    >
-                      Consult Doctor
-                    </button>
-                  )}
-                </div>
-                {message.sender === "user" && (
-                  <div className="bg-white rounded-full p-2 flex-shrink-0">
-                    <User className="h-4 w-4 text-blue-600" />
-                  </div>
-                )}
-              </div>
-
-              {message.sender === "ai" &&
-                typeof step === 'number' && step >= 0 &&
-                message.text.includes("* skip") && (
-                  <button
-                    onClick={() => handleNext("*")}
-                    className="self-start mt-2 ml-12 px-3 py-1 bg-gray-300 rounded-md text-sm hover:bg-gray-400 transition-colors"
-                  >
-                    Skip
-                  </button>
-                )}
-            </div>
-          ))}
+          <MessageList messages={messages} step={step} handleNext={handleNext} />
           {isTyping && (
             <div className="flex items-start space-x-3">
               <div className="bg-white rounded-full p-2 flex-shrink-0">
@@ -530,10 +795,8 @@ const Chatbot: React.FC = () => {
             </div>
           )}
         </div>
-
         <div className="border-t border-gray-300 p-4 flex space-x-3 items-center">
           <input
-            ref={inputRef}
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}

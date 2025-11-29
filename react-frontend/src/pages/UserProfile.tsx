@@ -23,7 +23,7 @@ import {
 import SymptomsSection from "@/components/ui/SymptomsSection";
 
 interface PatientProfile {
-  id?: number;
+  id?: string;
   auth_id: string;
   email: string;
   full_name: string;
@@ -421,7 +421,7 @@ export default function UserProfile() {
 
               <Link
                 to="/doctor_registration"
-                className="inline-flex items-center bg-gradient-to-r from-green-500 to-blue-500 text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg transition-all duration-300 group"
+                className="inline-flex items-center bg-blue-gradient text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg transition-all duration-300 group"
               >
                 <Stethoscope className="w-5 h-5 mr-2" />
                 Register Yourself as a Doctor
@@ -471,7 +471,7 @@ export default function UserProfile() {
                       {!isEditing ? (
                         <button
                           onClick={() => setIsEditing(true)}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center"
+                          className="bg-[#1c5a6a] text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center"
                         >
                           <Edit3 className="w-4 h-4 mr-2" />
                           Edit Profile

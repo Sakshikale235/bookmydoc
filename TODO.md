@@ -1,28 +1,55 @@
-# TODO: Fix Doctor Registration and Login Issues
+# Interactive Symptom Checker Chatbot Implementation
 
-## Issues
-1. Medical license and certificates not saved to storage buckets during doctor registration.
-2. Doctor registration email/password not saved in users table for authentication.
-3. Login not redirecting doctors to /doctor_selfprofile.
-
-## Plan
-1. **Create users table** for custom authentication.
-2. **Install bcryptjs** for password hashing.
-3. **Modify DoctorRegistration.tsx**:
-   - Add password hashing and insert into users table.
-   - Add upload logic for medicalLicenseFile to 'medical_license' bucket.
-   - Add upload logic for medicalCertificatesFile to 'certificates' bucket.
-   - Update doctors insert to include medical_license and medical_certificates URLs.
-4. **Modify LoginPage.tsx**:
-   - Add logic to check users table first for authentication.
-   - If found, verify password and redirect based on role.
-   - Fallback to Supabase auth for patients.
-5. **Test** doctor registration and login.
+## Overview
+Enhance the chatbot to be interactive: recover from bad input, handle follow-ups, guide users, support out-of-flow interactions like doctor searches, edits, and emergencies.
 
 ## Steps
-- [ ] Create users table in Supabase: id (uuid pk), email (text unique), password_hash (text), role (text), created_at (timestamp).
-- [ ] Install bcryptjs in react-frontend.
-- [ ] Update DoctorRegistration.tsx handleSubmitAsync.
-- [ ] Update LoginPage.tsx handleLogin.
-- [ ] Test registration: files uploaded, profile created, users inserted.
-- [ ] Test login: doctors redirect to /doctor_selfprofile.
+
+### 1. Add Validators and Intent Detection to Chatbot.tsx
+- [ ] Add validateAge, validateHeight, validateWeight functions.
+- [ ] Add detectSimpleIntent function for local rule-based intent detection.
+- [ ] Add state for summary visibility, edit mode, and conversation history.
+
+### 2. Update handleNext Logic
+- [ ] Modify handleNext to route based on intents (doctor_search, edit, emergency, etc.).
+- [ ] Add validation for current step inputs.
+- [ ] Handle edit commands (e.g., "change age to 30").
+- [ ] Handle doctor queries mid-flow.
+- [ ] Add emergency handling with banner.
+
+### 3. Create SummaryCard Component
+- [ ] Create react-frontend/src/components/ui/SummaryCard.tsx.
+- [ ] Display collected user info (age, gender, height, weight, location, BMI).
+- [ ] Add edit buttons for each field.
+
+### 4. Integrate SummaryCard into Chatbot
+- [ ] Add SummaryCard above the input area.
+- [ ] Handle edit button clicks to jump to specific steps.
+
+### 5. Add Backend Endpoints
+- [ ] Add doctor_search endpoint in backend/api/views.py.
+- [ ] Add doctor_detail endpoint.
+- [ ] Optionally add classify_intent endpoint using Gemini.
+
+### 6. Update UI and Flows
+- [ ] Add quick reply buttons (Continue, Edit Age, Show doctors).
+- [ ] Ensure session persistence for logged-in users.
+- [ ] Add clarifying questions for low-confidence intents.
+
+### 7. Testing
+- [ ] Test invalid input recovery (e.g., invalid age).
+- [ ] Test edit flow (e.g., "change age to 30").
+- [ ] Test doctor search mid-flow (e.g., "show me Dr. X").
+- [ ] Test emergency handling.
+- [ ] Test out-of-flow questions.
+
+## Dependent Files
+- react-frontend/src/components/ui/Chatbot.tsx
+- react-frontend/src/components/ui/SummaryCard.tsx (new)
+- backend/api/views.py
+- backend/api/urls.py (add new routes)
+
+## Followup Steps
+- Install any new dependencies if needed (none expected).
+- Run frontend and backend, test the chatbot.
+- Update documentation if necessary.
