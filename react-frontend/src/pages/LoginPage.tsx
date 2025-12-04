@@ -346,6 +346,11 @@ const LoginPage: React.FC = () => {
   const [isActive, setIsActive] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // PASSWORD VISIBILITY STATES
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
+
+
   const LOCATIONIQ_API_KEY = import.meta.env.VITE_LOCATIONIQ_API_KEY;
 
   // 📍 Handle location permission
@@ -643,7 +648,7 @@ const LoginPage: React.FC = () => {
 
             <div style={inputBoxStyles}>
               <input
-                type="password"
+                type={showLoginPassword ? "text" : "password"}
                 placeholder="Password"
                 required
                 style={inputStyles}
@@ -651,8 +656,15 @@ const LoginPage: React.FC = () => {
                 onChange={(e) => setLoginPassword(e.target.value)}
                 disabled={loading}
               />
-              <i className="bx bxs-lock-alt" style={iconStyles}></i>
+
+              {/* Eye Icon */}
+              <i
+                className={showLoginPassword ? "bx bx-show" : "bx bx-hide"}
+                style={{ ...iconStyles, cursor: "pointer" }}
+                onClick={() => setShowLoginPassword(!showLoginPassword)}
+              ></i>
             </div>
+
 
             <div style={forgotLinkStyles}>
               <span onClick={handleForgotPassword} style={forgotLinkAStyles}>
@@ -696,9 +708,22 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div style={inputBoxStyles}>
-              <input type="password" placeholder="Create Password" required style={inputStyles} value={regPassword} onChange={(e) => setRegPassword(e.target.value)} />
-              <i className="bx bxs-lock-alt" style={iconStyles}></i>
+              <input
+                type={showRegPassword ? "text" : "password"}
+                placeholder="Create Password"
+                required
+                style={inputStyles}
+                value={regPassword}
+                onChange={(e) => setRegPassword(e.target.value)}
+              />
+
+              <i
+                className={showRegPassword ? "bx bx-show" : "bx bx-hide"}
+                style={{ ...iconStyles, cursor: "pointer" }}
+                onClick={() => setShowRegPassword(!showRegPassword)}
+              ></i>
             </div>
+
 
             <div style={checkboxStyles}>
               <input type="checkbox" id="terms" required style={checkboxInputStyles} checked={termsChecked} onChange={(e) => setTermsChecked(e.target.checked)} />
