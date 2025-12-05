@@ -233,6 +233,15 @@ const handleBookAppointment = async () => {
         return;
       }
 
+      // DEBUG: Check what data is being sent
+        console.log("APPOINTMENT INSERT DATA:", {
+          doctor_id: doctorId,
+          patient_id: patient?.id,
+          appointment_date: appointmentDate.toISOString(),
+          status: 'pending',
+          reason: patientInfo.reason || null
+        });
+
       // Insert appointment - THIS IS THE ONLY DATABASE OPERATION
       const { data: appointmentData, error: appointmentError } = await supabase
         .from('appointments')
@@ -240,7 +249,7 @@ const handleBookAppointment = async () => {
           doctor_id: doctorId,
           patient_id: patient?.id,
           appointment_date: appointmentDate.toISOString(),
-          status: 'scheduled',
+          status: 'pending',
           reason: patientInfo.reason || null
         })
         .select()
