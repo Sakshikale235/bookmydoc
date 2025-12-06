@@ -328,12 +328,15 @@ const LoginPage: React.FC = () => {
   // LOGIN STATES
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [loginShowPassword, setLoginShowPassword] = useState(false); // ⭐ added
+  const [resetMsg, setResetMsg] = useState(""); // ⭐ added
 
   // REGISTER STATES
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [regShowPassword, setRegShowPassword] = useState(false); // ⭐ added
 
   // LOCATION STATES
   const [locationChecked, setLocationChecked] = useState(false);
@@ -382,18 +385,22 @@ const LoginPage: React.FC = () => {
   //        ✅ FORGOT PASSWORD
   // ================================
   const handleForgotPassword = async () => {
-    const email = prompt("Enter your email to reset password:");
-    if (!email) return;
+    if (!loginEmail) {
+      setResetMsg("Please enter your email first.");
+      setTimeout(() => setResetMsg(""), 5000);
+      return;
+    }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    const { error } = await supabase.auth.resetPasswordForEmail(loginEmail.trim(), {
       redirectTo: "http://localhost:8080/reset-password",
     });
 
     if (error) {
-      alert("Error sending reset email: " + error.message);
+      setResetMsg("Error sending reset email: " + error.message);
     } else {
-      alert("Password reset email sent! Check your inbox.");
+      setResetMsg("Reset link sent!");
     }
+    setTimeout(() => setResetMsg(""), 5000);
   };
 
   // ================================
@@ -444,7 +451,7 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      // THEN CHECK DOCTOR (fallback to email)
+      // THEN CHECK DOCTOR
       const docLookup = await supabase
         .from("doctors")
         .select("id, auth_id, email")
@@ -471,7 +478,6 @@ const LoginPage: React.FC = () => {
 
             console.log("Updated doctors.auth_id for doctor id:", byEmail.data.id);
 
-            // FIX: update response fields instead of replacing
             docLookup.data = { ...byEmail.data, auth_id: user.id };
             docLookup.error = null;
           } catch (upErr) {
@@ -591,7 +597,7 @@ const LoginPage: React.FC = () => {
   const h1Styles: React.CSSProperties = { fontSize: "36px", margin: "5px 0" };
   const inputBoxStyles: React.CSSProperties = { position: "relative", margin: "15px 0" };
   const inputStyles: React.CSSProperties = { width: "100%", padding: "13px 50px 13px 20px", background: "#eee", borderRadius: "8px", border: "none", outline: "none", fontSize: "16px", color: "#333", fontWeight: 500 };
-  const iconStyles: React.CSSProperties = { position: "absolute", right: "20px", top: "50%", transform: "translateY(-50%)", fontSize: "20px", color: "#333" };
+  const iconStyles: React.CSSProperties = { position: "absolute", right: "20px", top: "50%", transform: "translateY(-50%)", fontSize: "20px", color: "#333", cursor: "pointer" };
   const forgotLinkStyles: React.CSSProperties = { margin: "-15px 0 15px" };
   const forgotLinkAStyles: React.CSSProperties = { fontSize: "14.5px", color: "#2D9CDB", textDecoration: "none", cursor: "pointer" };
   const btnStyles: React.CSSProperties = { width: "100%", height: "48px", backgroundColor: "#2D9CDB", boxShadow: "0 0 10px rgba(0,0,0,0.1)", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "16px", color: "#fff", fontWeight: 600 };
@@ -643,7 +649,7 @@ const LoginPage: React.FC = () => {
 
             <div style={inputBoxStyles}>
               <input
-                type="password"
+                type={loginShowPassword ? "text" : "password"}
                 placeholder="Password"
                 required
                 style={inputStyles}
@@ -651,8 +657,17 @@ const LoginPage: React.FC = () => {
                 onChange={(e) => setLoginPassword(e.target.value)}
                 disabled={loading}
               />
-              <i className="bx bxs-lock-alt" style={iconStyles}></i>
+              <i
+                className={`bx ${loginShowPassword ? "bxs-lock-open-alt" : "bxs-lock-alt"}`}
+                style={iconStyles}
+                onClick={() => setLoginShowPassword(!loginShowPassword)}
+              ></i>
             </div>
+
+            {/* ⭐ Reset message */}
+            {resetMsg && (
+              <p style={{ color: "green", fontSize: "14px", margin: "5px 0" }}>{resetMsg}</p>
+            )}
 
             <div style={forgotLinkStyles}>
               <span onClick={handleForgotPassword} style={forgotLinkAStyles}>
@@ -696,8 +711,19 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div style={inputBoxStyles}>
-              <input type="password" placeholder="Create Password" required style={inputStyles} value={regPassword} onChange={(e) => setRegPassword(e.target.value)} />
-              <i className="bx bxs-lock-alt" style={iconStyles}></i>
+              <input
+                type={regShowPassword ? "text" : "password"}
+                placeholder="Create Password"
+                required
+                style={inputStyles}
+                value={regPassword}
+                onChange={(e) => setRegPassword(e.target.value)}
+              />
+              <i
+                className={`bx ${regShowPassword ? "bxs-lock-open-alt" : "bxs-lock-alt"}`}
+                style={iconStyles}
+                onClick={() => setRegShowPassword(!regShowPassword)}
+              ></i>
             </div>
 
             <div style={checkboxStyles}>
@@ -753,6 +779,7 @@ const LoginPage: React.FC = () => {
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );
