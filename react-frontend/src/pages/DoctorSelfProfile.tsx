@@ -16,7 +16,8 @@ import {
   Plus,
   CheckCircle,
   XCircle,
-  Loader2
+  Loader2,
+  Inbox
 } from 'lucide-react';
 
 interface DoctorProfile {
@@ -72,6 +73,8 @@ const DoctorSelfProfile: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'slots'>('overview');
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState<Partial<DoctorProfile>>({});
+  const [showInbox, setShowInbox] = useState(false);
+
 
   // Fetch doctor profile, appointments, and available slots
   const fetchDoctorData = async () => {
@@ -179,7 +182,7 @@ const fetchAppointments = async () => {
 
     // Attach patient info
     const appointmentsWithPatients: AppointmentWithPatient[] = await Promise.all(
-      appointmentsData.map(async (apt: any) => {
+      appointmentsData.map(async (apt: Appointment) => {
         try {
           const { data: patient, error: patientError } = await supabase
             .from("patients")
@@ -259,7 +262,7 @@ const fetchAppointments = async () => {
 
   // Optional: legacy custom event listener used by your app
   useEffect(() => {
-    const handleNotificationReceived = (event: any) => {
+    const handleNotificationReceived = (event: Event) => {
       if (doctor) fetchAppointments();
     };
 
@@ -390,22 +393,42 @@ const fetchAppointments = async () => {
                 </div>
               </div>
             </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setEditMode(!editMode)}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
-              >
-                <Edit2 className="w-4 h-4" />
-                <span>{editMode ? 'Cancel' : 'Edit'}</span>
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center space-x-2 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Logout</span>
-              </button>
-            </div>
+            <div className="relative flex space-x-2">
+  {/* Inbox Button */}
+  <button
+    onClick={() => setShowInbox(!showInbox)}
+    className="flex items-center space-x-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200"
+  >
+    <Inbox className="w-4 h-4" />
+    <span>Inbox</span>
+  </button>
+
+  {/* Inbox Dropdown Box */}
+  {showInbox && (
+    <div className="absolute right-0 top-12 w-64 bg-white shadow-lg border border-gray-200 rounded-lg p-4 z-50">
+      <p className="font-semibold text-gray-900 mb-2">Inbox</p>
+      <p className="text-gray-600 text-sm">No new messages</p>
+    </div>
+  )}
+
+  {/* Edit Button */}
+  <button
+    onClick={() => setEditMode(!editMode)}
+    className="flex items-center space-x-2 px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
+  >
+    <Edit2 className="w-4 h-4" />
+    <span>{editMode ? 'Cancel' : 'Edit'}</span>
+  </button>
+
+  {/* Logout Button */}
+  <button
+    onClick={handleLogout}
+    className="flex items-center space-x-2 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
+  >
+    <LogOut className="w-4 h-4" />
+    <span>Logout</span>
+  </button>
+</div>
           </div>
 
           {/* Quick Stats */}
