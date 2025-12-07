@@ -85,7 +85,7 @@ const Navigation = () => {
         <div className="flex justify-between items-center h-16" ref={navRef}>
           {/* Logo */}
           {/* Logo */}
-          <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate("/index")}>
+          <div className="flex items-center space-x-2 cursor-pointer">
             <img src={logo} alt="BookMyDoc Logo" className="h-12 w-auto object-contain" />
           </div>
 

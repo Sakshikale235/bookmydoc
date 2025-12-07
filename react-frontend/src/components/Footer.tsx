@@ -11,7 +11,7 @@ const Footer = () => {
           {/* Company Info */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <div className="bg-[#2D9CDB] rounded-full p-2">
+              <div className="bg-gradient-primary rounded-full p-2">
                 <Stethoscope className="h-6 w-6 text-white" />
               </div>
               <span className="text-2xl font-bold">BookMyDoc</span>
@@ -20,17 +20,17 @@ const Footer = () => {
               Your trusted healthcare partner providing exceptional medical care with experienced doctors and modern facilities.
             </p>
             <div className="flex space-x-3">
-              <Button variant="ghost" size="icon" className="hover:bg-background/10">
-                <Facebook className="h-5 w-5" />
+              <Button className="bg-gradient-primary hover:opacity-90 transition-all duration-300 w-10 h-10 rounded-full flex items-center justify-center">
+                <Facebook className="h-5 w-5 text-white" />
               </Button>
-              <Button variant="ghost" size="icon" className="hover:bg-background/10">
-                <Twitter className="h-5 w-5" />
+              <Button className="bg-gradient-primary hover:opacity-90 transition-all duration-300 w-10 h-10 rounded-full flex items-center justify-center">
+                <Twitter className="h-5 w-5 text-white" />
               </Button>
-              <Button variant="ghost" size="icon" className="hover:bg-background/10">
-                <Instagram className="h-5 w-5" />
+              <Button className="bg-gradient-primary hover:opacity-90 transition-all duration-300 w-10 h-10 rounded-full flex items-center justify-center">
+                <Instagram className="h-5 w-5 text-white" />
               </Button>
-              <Button variant="ghost" size="icon" className="hover:bg-background/10">
-                <Linkedin className="h-5 w-5" />
+              <Button className="bg-gradient-primary hover:opacity-90 transition-all duration-300 w-10 h-10 rounded-full flex items-center justify-center">
+                <Linkedin className="h-5 w-5 text-white" />
               </Button>
             </div>
           </div>
@@ -113,7 +113,7 @@ const Footer = () => {
                 placeholder="Enter your email address"
                 className="bg-background/10 border-background/30 text-background placeholder:text-background/50 focus:border-primary"
               />
-              <Button className="bg-[#2D9CDB] hover:shadow-medical transition-all duration-300 px-8">
+              <Button className="bg-gradient-primary hover:opacity-90 transition-all duration-300 px-8 text-white">
                 Subscribe
               </Button>
             </div>

@@ -258,12 +258,12 @@ const SpecialistsCarousel = () => {
                          </div>
                          
                          <Button 
-                           size="sm" 
-                           className="w-full bg-[#1c5a6a] hover:shadow-medical transition-all hover:bg-[#56CCF2] duration-300 text-xs sm:text-sm"
-                           onClick={() => navigate(`/doctor_consultation?specialization=${encodeURIComponent(specialist.name)}`)}
-                         >
-                           View Doctors
-                         </Button>
+  size="sm" 
+  className="w-full bg-gradient-primary hover:shadow-medical transition-all hover:opacity-90 duration-300 text-xs sm:text-sm"
+  onClick={() => navigate(`/doctor_consultation?specialization=${encodeURIComponent(specialist.name)}`)}
+>
+  View Doctors
+</Button>
                       </CardContent>
                     </Card>
                   </div>

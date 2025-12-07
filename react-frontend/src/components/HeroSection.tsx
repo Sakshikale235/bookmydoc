@@ -236,13 +236,14 @@ const HeroSection = () => {
                 </div>
 
                 <Button
-                  onClick={handleUseCurrentLocation}
-                  disabled={loadingLocation}
-                  className="h-12 px-4 flex items-center gap-2 bg-[#1c5a6a] hover:bg-[#0dbaaf]"
-                >
-                  <Crosshair className="h-5 w-5" />
-                  {loadingLocation ? "Locating..." : "Use"}
-                </Button>
+  onClick={handleUseCurrentLocation}
+  disabled={loadingLocation}
+  className="h-12 px-4 flex items-center gap-2 bg-blue-gradient hover:opacity-90 transition-all duration-300 text-white"
+>
+  <Crosshair className="h-5 w-5" />
+  {loadingLocation ? "Locating..." : "Use"}
+</Button>
+
               </div>
 
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>

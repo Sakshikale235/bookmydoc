@@ -470,12 +470,13 @@ export default function UserProfile() {
                     <div className="flex gap-2">
                       {!isEditing ? (
                         <button
-                          onClick={() => setIsEditing(true)}
-                          className="bg-[#1c5a6a] text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center"
-                        >
-                          <Edit3 className="w-4 h-4 mr-2" />
-                          Edit Profile
-                        </button>
+  onClick={() => setIsEditing(true)}
+  className="bg-gradient-primary text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-all flex items-center"
+>
+  <Edit3 className="w-4 h-4 mr-2" />
+  Edit Profile
+</button>
+
                       ) : (
                         <button
                           onClick={() => setIsEditing(false)}
