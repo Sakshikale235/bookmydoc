@@ -4,43 +4,20 @@ import { Bot, User, Send } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import MessageList from "./chatbot/MessageList";
 import MessageInput from "./chatbot/MessageInput";
-
-type Message = {
-  id: string;
-  text: string;
-  sender: "user" | "ai";
-  timestamp: Date;
-};
-
-type UserInfo = {
-  id?: string;
-  auth_id?: string;
-  age?: number | null;
-  gender?: string | null;
-  height?: number | null;
-  weight?: number | null;
-  location?: string | null;
-  address?: string | null;
-  symptoms?: string;
-  blood_group?: string | null;
-  full_name?: string;
-  latitude?: number | null;
-  longitude?: number | null;
-};
-
-// Validation functions
-const validateAge = (v: string) => {
-  const n = Number(v);
-  return Number.isInteger(n) && n > 0 && n < 120;
-};
-const validateHeight = (v: string) => {
-  const n = Number(v);
-  return !Number.isNaN(n) && n > 30 && n < 300;
-};
-const validateWeight = (v: string) => {
-  const n = Number(v);
-  return !Number.isNaN(n) && n > 2 && n < 600;
-};
+import SummaryCard from "./SummaryCard";
+import { Message, UserInfo } from "../../types/chatbot";
+import { fieldNames } from "./chatbot/intents/steps";
+import { validators } from "./chatbot/intents/validators";
+import { createConversation, appendMessage, fetchHistory } from "../../lib/chatApi";
+// Provide local wrappers so the component can call validateAge/Height/Weight
+// without depending on named exports (keeps call sites unchanged).
+const validateAge = (v: string) => validators.age(v);
+const validateHeight = (v: string) => validators.height(v);
+const validateWeight = (v: string) => validators.weight(v);
+import { detectEmergency, detectIntent } from "./chatbot/intents/intentDetector";
+import { correctSentence } from "./chatbot/intents/keywordCorrection";
+import { extractEntities } from "./chatbot/intents/entityDetector";
+import { getNextAction, ConversationState } from "./chatbot/intents/steps";
 
 // Simple intent detection based on keywords
 type IntentResult = {
@@ -48,6 +25,32 @@ type IntentResult = {
   target?: string;
   value?: string;
 };
+
+function levenshtein(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j] + 1 // deletion
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
 
 function detectSimpleIntent(text: string): IntentResult {
   const t = text.toLowerCase();
@@ -69,6 +72,7 @@ const Chatbot: React.FC<{}> = () => {
   const [patientDataFetched, setPatientDataFetched] = useState(false);
   const [dataConfirmed, setDataConfirmed] = useState(false);
   const [updatingField, setUpdatingField] = useState<string | null>(null);
+  const [detailsShown, setDetailsShown] = useState(false);
 
   const [step, setStep] = useState<number | "doctor_suggestion">(-1);
   const [userInfo, setUserInfo] = useState<UserInfo>({});
@@ -84,20 +88,32 @@ const Chatbot: React.FC<{}> = () => {
 
   const getMessageId = () => (messageIdRef.current++).toString();
 
+  // Conversation state (backend conversation for chat history persistence)
+  const [conversationId, setConversationId] = useState<string | null>(null);
+
+  // Push a message locally and also append it to backend conversation when available
+  const pushAndSave = async (sender: "ai" | "user", text: string, meta?: any) => {
+    const msg: Message = { id: getMessageId(), text, sender, timestamp: new Date(), meta };
+    setMessages((prev) => [...prev, msg]);
+    if (conversationId) {
+      try {
+        await appendMessage(conversationId, sender, text, meta || {});
+      } catch (e) {
+        console.warn("appendMessage failed", e);
+      }
+    }
+  };
+
   useEffect(() => {
     const fetchPatient = async () => {
       try {
+        await pushAndSave("ai", "Hi, I am your health assistant");
         const { data: authData } = await supabase.auth.getUser();
         const authUser = (authData as any)?.user;
         if (!authUser) {
-          pushMessage({
-            id: getMessageId(),
-            text: "Hello! Please sign in to use the symptom assistant.",
-            sender: "ai",
-            timestamp: new Date(),
-          });
+          await pushAndSave("ai", "Hello! Please sign in to use the symptom assistant.");
           setStep(0);
-          return;
+          return authUser;
         }
 
         const { data: patient } = await supabase
@@ -119,36 +135,47 @@ const Chatbot: React.FC<{}> = () => {
             location: patient.address,
           });
           setPatientDataFetched(true);
-          pushMessage({
-            id: getMessageId(),
-            text: `Hello ${patient.full_name || ""}! I have your saved details. Are these correct? Reply 'yes' or 'no'.\n\nAge: ${patient.age ?? "Not provided"}\nGender: ${patient.gender ?? "Not provided"}\nHeight: ${
-              patient.height ? patient.height + " cm" : "Not provided"
-            }\nWeight: ${patient.weight ? patient.weight + " kg" : "Not provided"}\nBlood Group: ${
-              patient.blood_group ?? "Not provided"
-            }\nAddress: ${patient.address ?? "Not provided"}`,
-            sender: "ai",
-            timestamp: new Date(),
-          });
         } else {
-          pushMessage({
-            id: getMessageId(),
-            text: "Hello! I can help analyze symptoms. To begin, please tell me your age.",
-            sender: "ai",
-            timestamp: new Date(),
-          });
+          await pushAndSave("ai", "Hello! I can help analyze symptoms. To begin, please tell me your age.");
           setStep(0);
         }
+        return authUser;
       } catch (e) {
-        pushMessage({
-          id: getMessageId(),
-          text: "Hello! I can help analyze symptoms. To begin, please tell me your age.",
-          sender: "ai",
-          timestamp: new Date(),
-        });
+        await pushAndSave("ai", "Hello! I can help analyze symptoms. To begin, please tell me your age.");
         setStep(0);
+        return null;
       }
     };
-    fetchPatient();
+
+    const initConversation = async (authUser: any) => {
+      try {
+        const authId = (authUser as any)?.id ?? null;
+        const convo = await createConversation(authId, { source: "chatbot_ui" });
+        if (convo && convo.id) {
+          setConversationId(convo.id);
+          // load history
+          const hist = await fetchHistory(convo.id, 200);
+          if (hist && hist.messages && hist.messages.length > 0) {
+            // Map backend messages into local Message shape and append
+            const mapped = hist.messages.map((m: any) => ({
+              id: (m.id ?? getMessageId()).toString(),
+              text: m.text,
+              sender: m.role === "ai" ? "ai" : "user",
+              timestamp: m.created_at ? new Date(m.created_at) : new Date(),
+              meta: m.meta || {},
+            }));
+            setMessages((prev) => [...prev, ...mapped]);
+          }
+        }
+      } catch (e) {
+        console.warn("conversation create failed", e);
+      }
+    };
+
+    (async () => {
+      const authUser = await fetchPatient();
+      await initConversation(authUser);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -165,289 +192,247 @@ const Chatbot: React.FC<{}> = () => {
     "Please describe your symptoms in detail.",
   ];
 
+  const extractName = (text: string) => {
+    const patterns = [
+      /my name is (\w+)/i,
+      /i am (\w+)/i,
+      /call me (\w+)/i,
+    ];
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) return match[1];
+    }
+    return null;
+  };
+
   const handleNext = async (raw: string) => {
     const value = raw.trim();
     if (!value) return;
-    pushMessage({
-      id: getMessageId(),
-      text: value,
-      sender: "user",
-      timestamp: new Date(),
-    });
+    await pushAndSave("user", value);
 
-    const vLower = value.toLowerCase();
+    // Extract name if provided (only for greeting, don't update profile)
+    const extractedName = extractName(value);
 
-    // Detect intent for natural language commands
-    const intent = detectSimpleIntent(value);
-
-    // Intent-based commands handling
-    if (intent.intent === "edit" && intent.target && intent.value) {
-      await handleEditIntent(intent.target, intent.value);
-      setInputText("");
-      return;
-    } else if (intent.intent === "doctor_search") {
-      handleDoctorSearchIntent();
-      setInputText("");
-      return;
-    } else if (intent.intent === "doctor_detail") {
-      handleDoctorDetailIntent(value);
-      setInputText("");
-      return;
-    } else if (intent.intent === "emergency") {
-      handleEmergencyIntent();
-      setInputText("");
-      return;
-    } else if (intent.intent === "summary") {
-      handleSummaryIntent();
+    // Check if user is greeting back and we need to show details
+    if (patientDataFetched && !detailsShown && (value.toLowerCase().includes("hi") || value.toLowerCase().includes("hello"))) {
+      const nameToUse = extractedName || userInfo.full_name || "";
+      await pushAndSave(
+        "ai",
+        `Hello ${nameToUse}! I have your saved details. Are these correct? Reply 'yes' or 'no'.\n\nAge: ${userInfo.age ?? "Not provided"}\nGender: ${userInfo.gender ?? "Not provided"}\nHeight: ${
+          userInfo.height ? userInfo.height + " cm" : "Not provided"
+        }\nWeight: ${userInfo.weight ? userInfo.weight + " kg" : "Not provided"}\nBlood Group: ${
+          userInfo.blood_group ?? "Not provided"
+        }\nAddress: ${userInfo.address ?? "Not provided"}`
+      );
+      setDetailsShown(true);
       setInputText("");
       return;
     }
 
-    if (patientDataFetched && !dataConfirmed) {
-      if (vLower === "yes") {
+    // Handle confirmation response after showing details (only if not in update mode)
+    if (detailsShown && !dataConfirmed && !updatingField) {
+      if (value.toLowerCase() === "yes") {
         setDataConfirmed(true);
-        pushMessage({
-          id: getMessageId(),
-          text: "Great! Please describe your symptoms in detail so I can help you find the right specialist.",
-          sender: "ai",
-          timestamp: new Date(),
-        });
+        await pushAndSave("ai", "Great! Now, please describe your symptoms in detail.");
         setStep(5);
-        setInputText("");
-        return;
-      }
-      if (vLower === "no") {
-        pushMessage({
-          id: getMessageId(),
-          text: "Which information needs to be updated? Please specify the field (age/gender/height/weight/blood group/address).",
-          sender: "ai",
-          timestamp: new Date(),
-        });
-        setUpdatingField("select");
-        setInputText("");
-        return;
-      }
-      if (updatingField === "select") {
-        const allowed = ["age", "gender", "height", "weight", "blood group", "address", "location"];
-        if (!allowed.includes(vLower)) {
-          pushMessage({
-            id: getMessageId(),
-            text: "Please choose one of: age, gender, height, weight, blood group, address, location",
-            sender: "ai",
-            timestamp: new Date(),
-          });
-          setInputText("");
-          return;
-        }
-        setUpdatingField(vLower);
-        pushMessage({
-          id: getMessageId(),
-          text: `Please provide the new value for ${vLower}:`,
-          sender: "ai",
-          timestamp: new Date(),
-        });
-        setInputText("");
-        return;
-      }
-      if (updatingField && updatingField !== "select") {
-        const field = updatingField;
-        let ok = true;
-        let msg = "";
-        const updateData: Partial<UserInfo> = {};
-        switch (field) {
-          case "age":
-            if (!validateAge(value)) {
-              ok = false;
-              msg = "That doesn't look like a valid age. Please enter valid age (1-119).";
-            } else updateData.age = parseInt(value);
-            break;
-          case "gender":
-            if (!["male", "female", "trans"].includes(vLower)) {
-              ok = false;
-              msg = "That doesn't look like a valid gender. Please enter male, female, or trans.";
-            } else updateData.gender = value;
-            break;
-          case "height":
-            if (!validateHeight(value)) {
-              ok = false;
-              msg = "That doesn't look like a valid height. Please enter height in cm (30-300).";
-            } else updateData.height = parseFloat(value);
-            break;
-          case "weight":
-            if (!validateWeight(value)) {
-              ok = false;
-              msg = "That doesn't look like a valid weight. Please enter weight in kg (2-600).";
-            } else updateData.weight = parseFloat(value);
-            break;
-          case "blood group":
-            if (!["a+", "a-", "b+", "b-", "ab+", "ab-", "o+", "o-"].includes(vLower)) {
-              ok = false;
-              msg = "That doesn't look like a valid blood group. Please enter valid blood group (e.g., A+).";
-            } else updateData.blood_group = value;
-            break;
-          case "address":
-          case "location":
-            if (value.length < 3) {
-              ok = false;
-              msg = "Please enter a valid address or location.";
-            } else {
-              updateData.address = value;
-              updateData.location = value;
-            }
-            break;
-          default:
-            ok = false;
-        }
-        if (!ok) {
-          pushMessage({
-            id: getMessageId(),
-            text: msg,
-            sender: "ai",
-            timestamp: new Date(),
-          });
-          setInputText("");
-          return;
-        }
-        if (userInfo.id) {
-          try {
-            const { error } = await supabase.from("patients").update(updateData).eq("id", userInfo.id);
-            if (error) throw error;
-            setUserInfo((prev) => ({ ...prev, ...updateData }));
-            pushMessage({
-              id: getMessageId(),
-              text: `${field} updated. Are all other details correct now? (yes/no)`,
-              sender: "ai",
-              timestamp: new Date(),
-            });
-            setUpdatingField(null);
-            setInputText("");
-            return;
-          } catch (e) {
-            pushMessage({
-              id: getMessageId(),
-              text: "Failed to update — please try again later.",
-              sender: "ai",
-              timestamp: new Date(),
-            });
-            setInputText("");
-            return;
-          }
-        }
-      }
-    }
-
-    if (step === "doctor_suggestion") {
-      if (vLower === "yes") {
-        handleNearbyDoctors();
-      } else if (vLower === "no") {
-        pushMessage({
-          id: getMessageId(),
-          text: "Okay — if you need anything else, feel free to ask anytime.",
-          sender: "ai",
-          timestamp: new Date(),
-        });
+      } else if (value.toLowerCase() === "no") {
+        await pushAndSave("ai", "Which information would you like to update?\n\n1. age\n2. gender\n3. height\n4. weight\n5. blood group\n6. address\n\nPlease enter the number or the field name.");
+        setUpdatingField("select_field");
       } else {
-        pushMessage({
-          id: getMessageId(),
-          text: "Please reply 'yes' or 'no'.",
-          sender: "ai",
-          timestamp: new Date(),
-        });
+        await pushAndSave("ai", "Please reply 'yes' or 'no' to confirm your details.");
       }
       setInputText("");
       return;
     }
 
-    if (typeof step === "number" && step >= 0) {
-      let isValid = true;
-      let errMsg = "";
-      switch (step) {
-        case 0:
-          if (!validateAge(value)) {
-            isValid = false;
-            errMsg = "That doesn't look like a valid age. Please enter age between 1 and 119.";
+    // Handle field selection for update
+    if (updatingField === "select_field") {
+      const input = value.toLowerCase().trim();
+      const numMatch = input.match(/^(\d+)/);
+      const key = numMatch ? numMatch[1] : input;
+      const fieldMap: { [key: string]: string } = {
+        "1": "age",
+        "age": "age",
+        "2": "gender",
+        "gender": "gender",
+        "3": "height",
+        "height": "height",
+        "4": "weight",
+        "weight": "weight",
+        "5": "blood group",
+        "blood group": "blood group",
+        "6": "address",
+        "address": "address",
+      };
+      let selectedField = fieldMap[key];
+      if (!selectedField && !numMatch) {
+        // Fuzzy matching for field names
+        const fields = ["age", "gender", "height", "weight", "blood group", "address"];
+        let minDistance = Infinity;
+        let bestMatch = "";
+        for (const field of fields) {
+          const distance = levenshtein(input, field);
+          if (distance < minDistance) {
+            minDistance = distance;
+            bestMatch = field;
           }
-          break;
-        case 1:
-          if (!["male", "female", "trans"].includes(vLower)) {
-            isValid = false;
-            errMsg = "That doesn't look like a valid gender. Please enter male, female, or trans.";
-          }
-          break;
-        case 2:
-          if (!validateHeight(value)) {
-            isValid = false;
-            errMsg = "That doesn't look like a valid height. Please enter height in cm (30-300).";
-          }
-          break;
-        case 3:
-          if (!validateWeight(value)) {
-            isValid = false;
-            errMsg = "That doesn't look like a valid weight. Please enter weight in kg (2-600).";
-          }
-          break;
-        case 4:
-          if (value.length < 2) {
-            isValid = false;
-            errMsg = "Please enter valid location.";
-          }
-          break;
-        case 5:
-          if (value.length < 5) {
-            isValid = false;
-            errMsg = "Describe symptoms with at least 5 characters.";
-          }
-          break;
+        }
+        if (minDistance <= 2) { // Allow up to 2 edits
+          selectedField = bestMatch;
+        }
       }
-      if (!isValid) {
-        pushMessage({
-          id: getMessageId(),
-          text: errMsg,
-          sender: "ai",
-          timestamp: new Date(),
-        });
-        setInputText("");
-        return;
-      }
-      if (step === 0) setUserInfo((p) => ({ ...p, age: parseInt(value) }));
-      if (step === 1) setUserInfo((p) => ({ ...p, gender: value }));
-      if (step === 2) setUserInfo((p) => ({ ...p, height: parseFloat(value) }));
-      if (step === 3) setUserInfo((p) => ({ ...p, weight: parseFloat(value) }));
-      if (step === 4) setUserInfo((p) => ({ ...p, location: value }));
-      if (step === 5) setUserInfo((p) => ({ ...p, symptoms: value }));
-
-      if (step < steps.length - 1) {
-        const next = step + 1;
-        setStep(next);
-        pushMessage({
-          id: getMessageId(),
-          text: steps[next],
-          sender: "ai",
-          timestamp: new Date(),
-        });
+      if (selectedField) {
+        setUpdatingField(selectedField);
+        await pushAndSave("ai", `Please provide your new ${selectedField}.`);
       } else {
+        await pushAndSave("ai", "Please specify a valid field: age, gender, height, weight, blood group, or address.");
+      }
+      setInputText("");
+      return;
+    }
+
+    // Handle field updates if we're in update mode
+    if (updatingField) {
+      await handleFieldUpdate(updatingField, value);
+      setUpdatingField(null);
+      setInputText("");
+      return;
+    }
+
+    // Process through the sequential flow
+    const correctedText = correctSentence(value);
+    const entities = extractEntities(correctedText);
+    const intent = detectIntent(correctedText, entities);
+
+    const currentState: ConversationState = {
+      step: step as any,
+      userInfo,
+      intent,
+      entities,
+      lastMessage: value,
+    };
+
+    const action = getNextAction(currentState, value, intent, entities);
+
+    // Handle the action
+    switch (action.type) {
+      case "message":
+        if (action.message) {
+          await pushAndSave("ai", action.message);
+        }
+        if (action.nextStep) {
+          setStep(action.nextStep as any);
+        }
+        break;
+      case "ask_question":
+        if (action.message) {
+          await pushAndSave("ai", action.message);
+        }
+        if (action.nextStep) {
+          setStep(action.nextStep as any);
+        }
+        if (action.fieldToUpdate) {
+          setUpdatingField(action.fieldToUpdate);
+        }
+        break;
+      case "analyze_symptoms":
+        if (action.message) {
+          await pushAndSave("ai", action.message);
+        }
         await sendToBackend({ ...userInfo, symptoms: value });
-      }
-      setInputText("");
-      return;
+        break;
+      case "error":
+        if (action.message) {
+          await pushAndSave("ai", action.message);
+        }
+        break;
+      case "update_state":
+        if (action.nextStep) {
+          setStep(action.nextStep as any);
+        }
+        break;
     }
 
-    // If no recognized step, prompt starting conversation
-    if (step === -1) {
-      setStep(0);
-      pushMessage({ id: getMessageId(), text: steps[0], sender: "ai", timestamp: new Date() });
-      setInputText("");
-      return;
-    }
-
-    // Fallback response
-    pushMessage({
-      id: getMessageId(),
-      text: "I'm sorry, I didn't understand that. Could you please rephrase or provide more details?",
-      sender: "ai",
-      timestamp: new Date(),
-    });
     setInputText("");
+  };
+
+  const handleFieldUpdate = async (field: string, value: string) => {
+    let updateData: Partial<UserInfo> = {};
+    let isValid = true;
+    let errorMsg = "";
+
+    switch (field) {
+      case "age":
+        if (!validators.age(value)) {
+          isValid = false;
+          errorMsg = "Age must be between 1 and 119";
+        } else {
+          updateData.age = parseInt(value);
+        }
+        break;
+      case "gender":
+        if (!validators.gender(value)) {
+          isValid = false;
+          errorMsg = "Gender must be male, female, or trans";
+        } else {
+          updateData.gender = value;
+        }
+        break;
+      case "height":
+        if (!validators.height(value)) {
+          isValid = false;
+          errorMsg = "Height must be between 30 and 300 cm";
+        } else {
+          updateData.height = parseFloat(value);
+        }
+        break;
+      case "weight":
+        if (!validators.weight(value)) {
+          isValid = false;
+          errorMsg = "Weight must be between 2 and 600 kg";
+        } else {
+          updateData.weight = parseFloat(value);
+        }
+        break;
+      case "blood_group":
+        if (!validators.blood_group(value)) {
+          isValid = false;
+          errorMsg = "Invalid blood group";
+        } else {
+          updateData.blood_group = value;
+        }
+        break;
+      case "address":
+        if (!validators.address(value)) {
+          isValid = false;
+          errorMsg = "Please enter a valid address";
+        } else {
+          updateData.address = value;
+          updateData.location = value;
+        }
+        break;
+    }
+
+    if (!isValid) {
+      await pushAndSave("ai", `❌ ${errorMsg}. Please try again.`);
+      return;
+    }
+
+    // Update local state
+    setUserInfo(prev => ({ ...prev, ...updateData }));
+
+    // Update database if user is logged in
+    if (userInfo.id) {
+      try {
+        const { error } = await supabase.from("patients").update(updateData).eq("id", userInfo.id);
+        if (error) throw error;
+        await pushAndSave("ai", `✅ Your ${field} has been updated successfully.`);
+      } catch (e) {
+        await pushAndSave("ai", "❌ Failed to update your information. Please try again.");
+      }
+    } else {
+      await pushAndSave("ai", `✅ Your ${field} has been updated locally.`);
+    }
   };
 
   const sendToBackend = async (data: UserInfo) => {
@@ -468,6 +453,11 @@ const Chatbot: React.FC<{}> = () => {
         location: data.location,
         address: data.address,
         symptoms: data.symptoms,
+        conversation_id: conversationId,
+        // include session_id for backend session tracking (some backends expect this key)
+        session_id: conversationId,
+        // include the user message text for LLM context
+        message: data.symptoms,
         latitude: userInfo.latitude,
         longitude: userInfo.longitude,
         date: new Date().toISOString()
@@ -505,12 +495,7 @@ const Chatbot: React.FC<{}> = () => {
         formattedText += `⚠️ **Severity:** ${parsedResult.severity || "Not available"}\n\n`;
         formattedText += `💡 **Advice:** ${parsedResult.advice || "No specific advice available"}\n\n`;
 
-        pushMessage({
-          id: "ai-result",
-          text: formattedText,
-          sender: "ai",
-          timestamp: new Date(),
-        });
+        await pushAndSave("ai", formattedText, { analysis: parsedResult });
 
         if (parsedResult.recommended_doctors && parsedResult.recommended_doctors.length > 0) {
           let doctorText = "👨‍⚕️ **Recommended doctors for you:**\n\n";
@@ -522,20 +507,20 @@ const Chatbot: React.FC<{}> = () => {
             if (doc.phone) doctorText += `  📞 ${doc.phone}\n\n`;
           });
 
-          pushMessage({
-            id: "ai-doctors",
-            text: doctorText,
-            sender: "ai",
-            timestamp: new Date(),
-          });
+          await pushAndSave("ai", doctorText, { doctors: parsedResult.recommended_doctors });
         } else {
           setTimeout(() => {
-            pushMessage({
-              id: "ai-doctor-prompt",
+            const promptMsg = {
+              id: getMessageId(),
               text: "Would you like me to suggest some doctors nearby? (yes/no)",
               sender: "ai",
               timestamp: new Date(),
-            });
+            } as Message;
+            // keep special id behaviour for UI buttons
+            setMessages((prev) => [...prev, { ...promptMsg, id: "ai-doctor-prompt" }]);
+            if (conversationId) {
+              appendMessage(conversationId, "ai", promptMsg.text, {}).catch((e) => console.warn("appendMessage failed", e));
+            }
             setStep("doctor_suggestion");
           }, 1000);
         }
@@ -543,12 +528,7 @@ const Chatbot: React.FC<{}> = () => {
 
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m.id !== "ai-typing"));
-      pushMessage({
-        id: "ai-error",
-        text: `❌ ${err instanceof Error ? err.message : "Network error or server not responding."}`,
-        sender: "ai",
-        timestamp: new Date(),
-      });
+      await pushAndSave("ai", `❌ ${err instanceof Error ? err.message : "Network error or server not responding."}`);
     } finally {
       setIsTyping(false);
     }

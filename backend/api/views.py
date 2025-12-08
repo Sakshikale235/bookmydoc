@@ -10,6 +10,13 @@ from datetime import datetime
 import jwt
 from supabase import create_client, Client
 from functools import wraps
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Conversation, Message
+from .serializers import ConversationSerializer, MessageSerializer
+from django.shortcuts import get_object_or_404
+from django.conf import settings
 
 # -----------------------------
 # Load environment variables
@@ -66,6 +73,16 @@ def analyze_symptoms(request):
         location = data.get("location", None)
         user_lat = data.get("latitude", None)
         user_lng = data.get("longitude", None)
+        # Optional conversation context (frontend may pass a conversation_id)
+        conversation_id = data.get("conversation_id") or data.get("convo_id")
+        context_messages = []
+        if conversation_id:
+            try:
+                # load_recent_messages_for_llm returns list[dict] with role/text
+                context_messages = load_recent_messages_for_llm(conversation_id, limit=8)
+            except Exception as e:
+                print(f"Failed to load conversation history for convo {conversation_id}: {e}")
+                context_messages = []
 
         # -----------------------------
         # Validate gender value
@@ -131,13 +148,24 @@ def analyze_symptoms(request):
         date_str = today.strftime("%Y-%m-%d")
         month = today.month
 
+        # Include recent conversation context (if any) to give the LLM additional signals
+        history_fragment = ""
+        try:
+            if context_messages:
+                # represent the last messages as role: text lines for context
+                history_lines = [f"{m.get('role', 'user')}: {m.get('text', '')}" for m in context_messages]
+                history_fragment = "\nConversation history (most recent first):\n" + "\n".join(history_lines)
+        except Exception:
+            history_fragment = ""
+
         prompt = f"""
-Hello! I am your AI health assistant.
-Height: {height}, Weight: {weight}, Age: {age}, Gender: {gender}, BMI: {bmi if bmi else 'null'}, Location: {location}, Date: {date_str} (month: {month})
-Symptoms: {symptoms}
-Respond ONLY with valid JSON like:
-{{"possible_diseases": ["Disease1"], "severity": "mild/moderate/severe", "doctor_recommendation": "Specialization", "advice": "Advice text", "bmi": {bmi if bmi else 'null'}}}
-"""
+    Hello! I am your AI health assistant.
+    Height: {height}, Weight: {weight}, Age: {age}, Gender: {gender}, BMI: {bmi if bmi else 'null'}, Location: {location}, Date: {date_str} (month: {month})
+    Symptom description: {symptoms}
+    {history_fragment}
+    Respond ONLY with valid JSON like:
+    {{"possible_diseases": ["Disease1"], "severity": "mild/moderate/severe", "doctor_recommendation": "Specialization", "advice": "Advice text", "bmi": {bmi if bmi else 'null'}}}
+    """
 
         # -----------------------------
         # Call Gemini API (try dynamic list of supported models)
@@ -278,6 +306,80 @@ Respond ONLY with valid JSON like:
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+# -----------------------------
+# Conversation management endpoints
+# -----------------------------
+
+# Create or return conversation (optionally pass auth_id)
+@api_view(["POST"])
+def create_conversation(request):
+    auth_id = request.data.get("auth_id")
+    metadata = request.data.get("metadata", {})
+    # Optionally you could try to find an existing open conversation for auth_id
+    convo = Conversation.objects.create(auth_id=auth_id, metadata=metadata)
+    return Response(ConversationSerializer(convo).data, status=status.HTTP_201_CREATED)
+
+# Append a message to a conversation (frontend calls for user and also saves ai messages)
+@api_view(["POST"])
+def append_message(request):
+    conv_id = request.data.get("conversation_id")
+    role = request.data.get("role")
+    text = request.data.get("text")
+    meta = request.data.get("meta", {})
+
+    if not conv_id or not role or text is None:
+        return Response({"error": "conversation_id, role and text required"},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    conversation = get_object_or_404(Conversation, pk=conv_id)
+
+    # Update stage ONLY if it's a user message
+    if role == "user":
+        old_stage = conversation.conversation_stage
+        new_stage = get_next_stage(old_stage, text)
+        conversation.conversation_stage = new_stage
+        conversation.save()
+
+    msg = Message.objects.create(
+        conversation=conversation, role=role, text=text, meta=meta
+    )
+
+    return Response(MessageSerializer(msg).data, status=status.HTTP_201_CREATED)
+
+    """
+    body: { conversation_id: <uuid>, role: "user"|"ai"|"system", text: "...", meta: {...} }
+    """
+    conv_id = request.data.get("conversation_id")
+    role = request.data.get("role")
+    text = request.data.get("text")
+    meta = request.data.get("meta", {})
+
+    if not conv_id or not role or text is None:
+        return Response({"error": "conversation_id, role and text required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    conversation = get_object_or_404(Conversation, pk=conv_id)
+    msg = Message.objects.create(conversation=conversation, role=role, text=text, meta=meta)
+    return Response(MessageSerializer(msg).data, status=status.HTTP_201_CREATED)
+
+# Get conversation history (with optional limit)
+@api_view(["GET"])
+def conversation_history(request, convo_id):
+    limit = int(request.query_params.get("limit", 100))
+    conversation = get_object_or_404(Conversation, pk=convo_id)
+    qs = conversation.messages.all().order_by("created_at")[:limit]
+    data = MessageSerializer(qs, many=True).data
+    return Response({"conversation": conversation.id, "messages": data})
+
+# Helper: load last N messages as plain text for LLM context
+def load_recent_messages_for_llm(conversation_id, limit=10):
+    conversation = Conversation.objects.get(pk=conversation_id)
+    qs = conversation.messages.all().order_by("-created_at")[:limit]  # latest first
+    # produce ordered oldest->newest
+    msgs = list(reversed(list(qs)))
+    # convert to simple list of dicts or string
+    history = [{"role": m.role, "text": m.text} for m in msgs]
+    return history
 
 # -----------------------------
 # Helper endpoint: list available Gemini models

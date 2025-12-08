@@ -1,4 +1,4 @@
-# Interactive Symptom Checker Chatbot Implementation
+<!-- # Interactive Symptom Checker Chatbot Implementation
 
 ## Overview
 Enhance the chatbot to be interactive: recover from bad input, handle follow-ups, guide users, support out-of-flow interactions like doctor searches, edits, and emergencies.
@@ -6,7 +6,7 @@ Enhance the chatbot to be interactive: recover from bad input, handle follow-ups
 ## Steps
 
 ### 1. Add Validators and Intent Detection to Chatbot.tsx
-- [ ] Add validateAge, validateHeight, validateWeight functions.
+- [x] Add validateAge, validateHeight, validateWeight functions.
 - [ ] Add detectSimpleIntent function for local rule-based intent detection.
 - [ ] Add state for summary visibility, edit mode, and conversation history.
 
@@ -52,4 +52,4 @@ Enhance the chatbot to be interactive: recover from bad input, handle follow-ups
 ## Followup Steps
 - Install any new dependencies if needed (none expected).
 - Run frontend and backend, test the chatbot.
-- Update documentation if necessary.
+- Update documentation if necessary. -->

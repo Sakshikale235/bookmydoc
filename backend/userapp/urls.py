@@ -26,7 +26,7 @@ from django.conf.urls.static import static
 #  path('api/', include('api.urls')),  # Include URLs from the api app
 # ]
 
-from .views import index
+# from .views import index
 
 # urlpatterns = [
 #     re_path(r'^.*$', index),  # catch all routes for React
