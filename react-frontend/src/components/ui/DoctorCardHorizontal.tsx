@@ -114,12 +114,12 @@ export const DoctorCardHorizontal: React.FC<DoctorCardHorizontalProps> = ({
               <span>Book Now</span>
             </Link>
             
-            <button
+            {/* <button
               onClick={() => onViewProfile?.(doctor)}
               className="bg-white hover:bg-gray-50 text-gray-700 border-2 border-gray-300 px-6 py-3 rounded-lg font-semibold text-center transition-all duration-200 hover:border-blue-600 hover:text-blue-600"
             >
               View Profile
-            </button>
+            </button> */}
           </div>
         </div>
       </div>
