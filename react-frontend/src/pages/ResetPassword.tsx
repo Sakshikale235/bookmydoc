@@ -27,6 +27,29 @@ export default function ResetPassword() {
       return;
     }
 
+    // 🔥 ROLE-BASED REDIRECT (Doctor vs User)
+    const { data: session } = await supabase.auth.getUser();
+
+    if (session?.user?.id) {
+      // Check if doctor
+      const { data: doctorData } = await supabase
+        .from("doctors")
+        .select("id")
+        .eq("auth_id", session.user.id)
+        .single();
+
+      if (doctorData) {
+        alert("Password reset successful!");
+        window.location.href = "/doctor-dashboard";
+        return;
+      }
+
+      // Default → user dashboard
+      alert("Password reset successful!");
+      window.location.href = "/user-dashboard";
+      return;
+    }
+
     alert("Password reset successful! Please login again.");
     window.location.href = "/login";
   };
