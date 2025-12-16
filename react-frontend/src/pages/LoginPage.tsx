@@ -92,69 +92,88 @@ const LoginPage: React.FC = () => {
   //              LOGIN
   // ================================
   const handleLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setLoading(true);
+  if (e) e.preventDefault();
+  setLoading(true);
 
-    try {
-      const res = await supabase.auth.signInWithPassword({
-        email: loginEmail.trim(),
-        password: loginPassword,
-      });
+  try {
+    const res = await supabase.auth.signInWithPassword({
+      email: loginEmail.trim(),
+      password: loginPassword,
+    });
 
-      if (res.error || !res.data.user) {
-        alert("Login failed: " + (res.error?.message || "Unknown error"));
-        setLoading(false);
-        return;
-      }
-
-      const user = res.data.user;
-
-      // Check if patient already exists
-      const existing = await supabase
-        .from("patients")
-        .select("id")
-        .eq("auth_id", user.id)
-        .maybeSingle();
-
-      // If no patient record exists → create from saved data
-      if (!existing.data) {
-        const saved = JSON.parse(
-          localStorage.getItem("pending_patient_data") || "{}"
-        );
-
-        const { error: insertErr } = await supabase.from("patients").insert([
-          {
-            auth_id: user.id,
-            full_name: saved.full_name ?? user.email.split("@")[0],
-            email: saved.email ?? user.email,
-            phone: saved.phone ?? null,
-            address: saved.address ?? null,
-            latitude: saved.latitude ?? null,
-            longitude: saved.longitude ?? null,
-            location_allowed: saved.location_allowed ?? false,
-            terms_accepted: saved.terms_accepted ?? false,
-          },
-        ]);
-
-        if (insertErr) {
-          console.error("Patient auto-create failed:", insertErr);
-        } else {
-          console.log("Patient profile created on first login!");
-        }
-
-        localStorage.removeItem("pending_patient_data");
-      }
-
-      localStorage.setItem("role", "patient");
-      localStorage.setItem("isLoggedIn", "true");
-      navigate("/index");
-    } catch (err) {
-      console.error("login exception:", err);
-      alert("Unexpected login error.");
-    } finally {
+    if (res.error || !res.data.user) {
+      alert("Login failed: " + (res.error?.message || "Unknown error"));
       setLoading(false);
+      return;
     }
-  };
+
+    const user = res.data.user;
+
+    // =========================
+    // 1️⃣ CHECK DOCTOR FIRST
+    // =========================
+    const { data: doctor, error: doctorErr } = await supabase
+      .from("doctors")
+      .select("id")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+
+    if (doctor) {
+      // ✅ DOCTOR FOUND
+      localStorage.setItem("role", "doctor");
+      localStorage.setItem("isLoggedIn", "true");
+      navigate("/doctor_selfprofile");
+      return;
+    }
+
+    // =========================
+    // 2️⃣ CHECK PATIENT
+    // =========================
+    const { data: patient } = await supabase
+      .from("patients")
+      .select("id")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+
+    // If patient does not exist → create from pending data
+    if (!patient) {
+      const saved = JSON.parse(
+        localStorage.getItem("pending_patient_data") || "{}"
+      );
+
+      const { error: insertErr } = await supabase.from("patients").insert([
+        {
+          auth_id: user.id,
+          full_name: saved.full_name ?? user.email.split("@")[0],
+          email: saved.email ?? user.email,
+          phone: saved.phone ?? null,
+          address: saved.address ?? null,
+          latitude: saved.latitude ?? null,
+          longitude: saved.longitude ?? null,
+          location_allowed: saved.location_allowed ?? false,
+          terms_accepted: saved.terms_accepted ?? false,
+        },
+      ]);
+
+      if (insertErr) {
+        console.error("Patient auto-create failed:", insertErr);
+      }
+
+      localStorage.removeItem("pending_patient_data");
+    }
+
+    // ✅ PATIENT LOGIN
+    localStorage.setItem("role", "patient");
+    localStorage.setItem("isLoggedIn", "true");
+    navigate("/index");
+
+  } catch (err) {
+    console.error("login exception:", err);
+    alert("Unexpected login error.");
+  } finally {
+    setLoading(false);
+  }
+};
 
 
   // ================================
