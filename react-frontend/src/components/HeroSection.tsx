@@ -191,13 +191,13 @@ const HeroSection = () => {
                 whileHover={{ scale: 1.05, x: 7 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Button
+                {/* <Button
                   variant="outline"
                   size="lg"
                   className="border-[#1c5a6a] text-[#1c5a6a] hover:bg-[#56CCF2] hover:text-primary-foreground text-base lg:text-lg px-6 lg:px-8 py-4 lg:py-6 transition-all hover:border-[#56CCF2] hover:shadow-glow-blue"
                 >
                   Emergency Care
-                </Button>
+                </Button> */}
               </motion.div>
             </div>
           </motion.div>
