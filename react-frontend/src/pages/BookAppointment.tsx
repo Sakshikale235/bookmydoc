@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar,
   Clock,
-  ArrowLeft,
   CheckCircle,
   User,
   ChevronLeft,
@@ -26,6 +25,7 @@ import {
 import { supabase } from '@/lib/supabaseClient';
 import { DoctorProfileCard } from '@/components/appointment/DoctorProfileCard';
 import { ReviewsSection } from '@/components/appointment/ReviewsSection';
+import emailjs from "@emailjs/browser";
 
 interface Doctor {
   id: string;
@@ -63,18 +63,17 @@ const BookAppointment = () => {
   const { doctorId } = useParams();
   const navigate = useNavigate();
 
-  // State
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Booking states
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [step, setStep] = useState(1);
+
   const [patientInfo, setPatientInfo] = useState({
     name: '',
     phone: '',
@@ -82,7 +81,6 @@ const BookAppointment = () => {
     reason: ''
   });
 
-  // Email / notification states
   const [emailSent, setEmailSent] = useState<boolean | null>(null);
   const [emailErrorMessage, setEmailErrorMessage] = useState<string | null>(null);
 
@@ -92,7 +90,6 @@ const BookAppointment = () => {
     '03:00 PM','03:30 PM','04:00 PM','04:30 PM','05:00 PM','05:30 PM'
   ];
 
-  // Fetch doctor, patient, reviews
   useEffect(() => {
     fetchData();
   }, [doctorId]);
@@ -129,9 +126,9 @@ const BookAppointment = () => {
       setPatient(patientData);
 
       setPatientInfo({
-        name: patientData.full_name || '',
-        phone: patientData.phone || '',
-        email: patientData.email || '',
+        name: patientData.full_name,
+        phone: patientData.phone,
+        email: patientData.email,
         reason: ''
       });
 
@@ -143,15 +140,18 @@ const BookAppointment = () => {
         .limit(10);
       if (reviewsError) throw reviewsError;
       setReviews(reviewsData || []);
-    } catch (error) {
-      console.error('Error fetching data:', error);
+    } catch (err: any) {
+      console.error(err);
       alert('Error loading data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Calendar helpers
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setPatientInfo({ ...patientInfo, [e.target.name]: e.target.value });
+  };
+
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -168,13 +168,7 @@ const BookAppointment = () => {
   const handleTimeSelect = (time: string) => setSelectedTime(time);
 
   const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() + (direction === 'next' ? 1 : -1))
-    );
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setPatientInfo({ ...patientInfo, [e.target.name]: e.target.value });
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + (direction === 'next' ? 1 : -1)));
   };
 
   const calculateAverageRating = () => {
@@ -198,7 +192,6 @@ const BookAppointment = () => {
       const appointmentDate = new Date(selectedDate);
       appointmentDate.setHours(hours, minutes, 0, 0);
 
-      // Insert appointment
       const { data: appointmentData, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
@@ -212,25 +205,26 @@ const BookAppointment = () => {
         .single();
       if (appointmentError) throw appointmentError;
 
-      // Edge function call for email
+      // EmailJS integration
       try {
-        const payload = {
-          doctor_id: doctor?.id,
-          patient_id: patient?.id,
-          appointment_date: appointmentDate.toISOString(),
-          doctor_full_name: doctor?.full_name,
-          doctor_email: doctor?.email,
-          clinic_name: doctor?.clinic_name,
-          consultation_fee: doctor?.consultation_fee,
-          reason: patientInfo.reason || null
-        };
-        const { error: emailError } = await supabase.functions.invoke('send-appointment-email', { body: JSON.stringify(payload) });
-        if (emailError) setEmailSent(false);
-        else setEmailSent(true);
-      } catch (err: any) {
-        console.error(err);
+        await emailjs.send(
+          "service_cxed7og",
+          "template_ltqs3lg",
+          {
+            email: patient?.email,
+            patient_name: patient?.full_name,
+            doctor_name: doctor?.full_name,
+            appointment_date: format(appointmentDate, 'MMMM d, yyyy'),
+            appointment_time: selectedTime,
+            clinic_name: doctor?.clinic_name,
+          },
+          "BbYfPfC3SzCNFKFj1"
+        );
+        setEmailSent(true);
+      } catch (e: any) {
+        console.error(e);
         setEmailSent(false);
-        setEmailErrorMessage(err?.message || 'Failed to send email.');
+        setEmailErrorMessage(e?.text || 'Email failed');
       }
 
       setStep(3);
@@ -275,7 +269,10 @@ const BookAppointment = () => {
               {/* Step 1: Date & Time */}
               {step===1 && (
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center"><Calendar className="w-6 h-6 mr-3 text-blue-500"/>Select Date & Time</h2>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <Calendar className="w-6 h-6 mr-3 text-blue-500"/>Select Date & Time
+                  </h2>
+
                   <div className="mb-8">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">{format(currentDate,'MMMM yyyy')}</h3>
@@ -284,30 +281,58 @@ const BookAppointment = () => {
                         <button onClick={()=>navigateMonth('next')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRight className="w-5 h-5"/></button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-7 gap-2 mb-4">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=><div key={d} className="text-center text-sm font-medium text-gray-500 py-2">{d}</div>)}</div>
-                    <div className="grid grid-cols-7 gap-2">{monthDays.map(date=>{
-                      const isDisabled = isDateDisabled(date);
-                      const isSelected = selectedDate && isSameDay(date,selectedDate);
-                      return (
-                        <motion.button key={date.toISOString()} whileHover={!isDisabled?{scale:1.05}:{}} whileTap={!isDisabled?{scale:0.95}:{}} onClick={()=>handleDateSelect(date)} disabled={isDisabled} className={`p-3 text-sm rounded-lg transition-all duration-200 ${isDisabled?'text-gray-300 cursor-not-allowed':isSelected?'bg-blue-600 text-white shadow-lg':'text-gray-700 hover:bg-blue-50 hover:text-blue-600'}`}>
-                          {format(date,'d')}
-                        </motion.button>
-                      )
-                    })}</div>
+
+                    <div className="grid grid-cols-7 gap-2 mb-4">
+                      {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=><div key={d} className="text-center text-sm font-medium text-gray-500 py-2">{d}</div>)}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-2">
+                      {monthDays.map(date=>{
+                        const isDisabled = isDateDisabled(date);
+                        const isSelected = selectedDate && isSameDay(date,selectedDate);
+                        return (
+                          <motion.button
+                            key={date.toISOString()}
+                            whileHover={!isDisabled?{scale:1.05}:{}} 
+                            whileTap={!isDisabled?{scale:0.95}:{}} 
+                            onClick={()=>handleDateSelect(date)} 
+                            disabled={isDisabled}
+                            className={`p-3 text-sm rounded-lg transition-all duration-200 ${isDisabled?'text-gray-300 cursor-not-allowed':isSelected?'bg-blue-600 text-white shadow-lg':'text-gray-700 hover:bg-blue-50 hover:text-blue-600'}`}
+                          >
+                            {format(date,'d')}
+                          </motion.button>
+                        )
+                      })}
+                    </div>
                   </div>
 
-                  {selectedDate && <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}}>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center"><Clock className="w-5 h-5 mr-2 text-blue-500"/>Available Slots - {format(selectedDate,'MMM d, yyyy')}</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                      {timeSlots.map(time=><motion.button key={time} whileHover={{scale:1.05}} whileTap={{scale:0.95}} onClick={()=>handleTimeSelect(time)} className={`p-3 text-sm rounded-lg border-2 transition-all duration-200 ${selectedTime===time?'border-blue-600 bg-blue-600 text-white shadow-lg':'border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'}`}>{time}</motion.button>)}
-                    </div>
-                  </motion.div>}
+                  {selectedDate && (
+                    <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}}>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <Clock className="w-5 h-5 mr-2 text-blue-500"/>Available Slots - {format(selectedDate,'MMM d, yyyy')}
+                      </h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {timeSlots.map(time=>(
+                          <motion.button
+                            key={time}
+                            whileHover={{scale:1.05}} whileTap={{scale:0.95}}
+                            onClick={()=>handleTimeSelect(time)}
+                            className={`p-3 text-sm rounded-lg border-2 transition-all duration-200 ${selectedTime===time?'border-blue-600 bg-blue-600 text-white shadow-lg':'border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'}`}
+                          >
+                            {time}
+                          </motion.button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
 
-                  {selectedDate && selectedTime && <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} className="mt-8 flex justify-end">
-                    <button onClick={()=>setStep(2)} className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center">
-                      Continue <ChevronRight className="w-5 h-5 ml-2"/>
-                    </button>
-                  </motion.div>}
+                  {selectedDate && selectedTime && (
+                    <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} className="mt-8 flex justify-end">
+                      <button onClick={()=>setStep(2)} className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center">
+                        Continue <ChevronRight className="w-5 h-5 ml-2"/>
+                      </button>
+                    </motion.div>
+                  )}
                 </div>
               )}
 
@@ -319,10 +344,10 @@ const BookAppointment = () => {
                     <div className="bg-blue-50 rounded-xl p-6">
                       <h3 className="font-semibold text-gray-900 mb-4">Appointment Summary</h3>
                       <div className="space-y-3 text-sm">
-                        <div className="flex justify-between"><span className="text-gray-600">Doctor:</span><span className="font-medium">{doctor.full_name}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Doctor:</span><span className="font-medium">{doctor?.full_name}</span></div>
                         <div className="flex justify-between"><span className="text-gray-600">Date:</span><span className="font-medium">{selectedDate && format(selectedDate,'MMMM d, yyyy')}</span></div>
                         <div className="flex justify-between"><span className="text-gray-600">Time:</span><span className="font-medium">{selectedTime}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Fee:</span><span className="font-medium text-green-600">${doctor.consultation_fee}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Fee:</span><span className="font-medium text-green-600">${doctor?.consultation_fee}</span></div>
                       </div>
                     </div>
 
@@ -354,16 +379,16 @@ const BookAppointment = () => {
                     Your appointment has been successfully booked.
                     {emailSent===null && ' You will receive a confirmation email shortly.'}
                     {emailSent===true && ` A confirmation email has been sent to ${patient?.email}.`}
-                    {emailSent===false && ` We were unable to send the confirmation email automatically.${emailErrorMessage?` (${emailErrorMessage})`:''} You will still receive an in-app notification.`}
+                    {emailSent===false && ` We were unable to send the confirmation email automatically.${emailErrorMessage?` (${emailErrorMessage})`:''}`}
                   </p>
 
                   <div className="bg-gray-50 rounded-xl p-6 mb-8 text-left max-w-md mx-auto">
                     <h3 className="font-semibold text-gray-900 mb-4">Appointment Details:</h3>
                     <div className="space-y-3 text-sm">
-                      <div className="flex justify-between"><span className="text-gray-600">Doctor:</span><span className="font-medium">{doctor.full_name}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-600">Doctor:</span><span className="font-medium">{doctor?.full_name}</span></div>
                       <div className="flex justify-between"><span className="text-gray-600">Date:</span><span className="font-medium">{selectedDate && format(selectedDate,'MMMM d, yyyy')}</span></div>
                       <div className="flex justify-between"><span className="text-gray-600">Time:</span><span className="font-medium">{selectedTime}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-600">Location:</span><span className="font-medium">{doctor.clinic_name}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-600">Location:</span><span className="font-medium">{doctor?.clinic_name}</span></div>
                     </div>
                   </div>
 
