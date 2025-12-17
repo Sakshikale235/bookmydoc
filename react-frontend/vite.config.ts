@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     allowedHosts: [
       "nugatory-nonfaltering-ayleen.ngrok-free.dev",
+       "dung-unmowed-nonabsolutistically.ngrok-free.dev",
       "*.ngrok-free.dev"
     ],
   },

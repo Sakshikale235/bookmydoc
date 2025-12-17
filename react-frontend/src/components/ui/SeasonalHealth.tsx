@@ -2,7 +2,11 @@ import React, { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ShieldAlert } from "lucide-react";
 
-const SeasonalHealth: React.FC = () => {
+interface SeasonalHealthProps {
+  chatbotRef?: React.RefObject<any>;
+}
+
+const SeasonalHealth: React.FC<SeasonalHealthProps> = ({ chatbotRef }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const smoothScroll = (id: string) => {
@@ -64,16 +68,29 @@ const SeasonalHealth: React.FC = () => {
               "Flu",
               "Cough",
               "Asthma",
-              "Bronchitis",
+              "Fever",
               "Allergies",
               "Skin Dryness",
               "Sinus Infection",
               "Joint Pain",
-              "Low Immunity",
+              "Skin Rashes",
             ].map((disease, idx) => (
               <span
                 key={idx}
                 className="disease-pill flex items-center space-x-1 px-4 py-2 bg-white border border-gray-200 rounded-full shadow-sm text-gray-700 text-sm cursor-pointer transition-all duration-200"
+                onClick={() => {
+                  if (chatbotRef?.current?.sendDiseaseMessage) {
+                    chatbotRef.current.sendDiseaseMessage(disease);
+                  }
+                  // Scroll to chatbot
+                  const chatbot = document.getElementById("chatbot-container");
+                  if (chatbot) {
+                    window.scrollTo({
+                      top: chatbot.offsetTop - 80,
+                      behavior: "smooth",
+                    });
+                  }
+                }}
               >
                 <ShieldAlert className="h-4 w-4 text-blue-500" />
                 <span>{disease}</span>

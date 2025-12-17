@@ -10,13 +10,6 @@ from datetime import datetime
 import jwt
 from supabase import create_client, Client
 from functools import wraps
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-from .models import Conversation, Message
-from .serializers import ConversationSerializer, MessageSerializer
-from django.shortcuts import get_object_or_404
-from django.conf import settings
 
 # -----------------------------
 # Load environment variables
@@ -73,16 +66,6 @@ def analyze_symptoms(request):
         location = data.get("location", None)
         user_lat = data.get("latitude", None)
         user_lng = data.get("longitude", None)
-        # Optional conversation context (frontend may pass a conversation_id)
-        conversation_id = data.get("conversation_id") or data.get("convo_id")
-        context_messages = []
-        if conversation_id:
-            try:
-                # load_recent_messages_for_llm returns list[dict] with role/text
-                context_messages = load_recent_messages_for_llm(conversation_id, limit=8)
-            except Exception as e:
-                print(f"Failed to load conversation history for convo {conversation_id}: {e}")
-                context_messages = []
 
         # -----------------------------
         # Validate gender value
@@ -148,24 +131,13 @@ def analyze_symptoms(request):
         date_str = today.strftime("%Y-%m-%d")
         month = today.month
 
-        # Include recent conversation context (if any) to give the LLM additional signals
-        history_fragment = ""
-        try:
-            if context_messages:
-                # represent the last messages as role: text lines for context
-                history_lines = [f"{m.get('role', 'user')}: {m.get('text', '')}" for m in context_messages]
-                history_fragment = "\nConversation history (most recent first):\n" + "\n".join(history_lines)
-        except Exception:
-            history_fragment = ""
-
         prompt = f"""
-    Hello! I am your AI health assistant.
-    Height: {height}, Weight: {weight}, Age: {age}, Gender: {gender}, BMI: {bmi if bmi else 'null'}, Location: {location}, Date: {date_str} (month: {month})
-    Symptom description: {symptoms}
-    {history_fragment}
-    Respond ONLY with valid JSON like:
-    {{"possible_diseases": ["Disease1"], "severity": "mild/moderate/severe", "doctor_recommendation": "Specialization", "advice": "Advice text", "bmi": {bmi if bmi else 'null'}}}
-    """
+Hello! I am your AI health assistant.
+Height: {height}, Weight: {weight}, Age: {age}, Gender: {gender}, BMI: {bmi if bmi else 'null'}, Location: {location}, Date: {date_str} (month: {month})
+Symptoms: {symptoms}
+Respond ONLY with valid JSON like:
+{{"possible_diseases": ["Disease1"], "severity": "mild/moderate/severe", "doctor_recommendation": "Specialization", "advice": "Advice text"}}
+"""
 
         # -----------------------------
         # Call Gemini API (try dynamic list of supported models)
@@ -222,6 +194,35 @@ def analyze_symptoms(request):
         # -----------------------------
         doctors_list = []
         recommended_specialty = reply_json.get("doctor_recommendation")
+        # Normalize specialty names to match DB canonical values
+        mapped_specialty = None
+        if recommended_specialty:
+            s = str(recommended_specialty).strip().lower()
+            # common synonyms / misspellings map
+            specialty_map = {
+                'general practitioner': 'General Physician',
+                'general practioneer': 'General Physician',
+                'gp': 'General Physician',
+                'general physician': 'General Physician',
+                'internist': 'Internal Medicine',
+                'cardiologist': 'Cardiologist',
+                'ent': 'ENT',
+                'ear nose throat': 'ENT'
+            }
+            # try exact mapping first
+            mapped_specialty = specialty_map.get(s)
+            # fallback: take first token before comma/and/paren and try mapping
+            if not mapped_specialty:
+                token = s.split('(')[0].split(' and ')[0].split(',')[0].strip()
+                mapped_specialty = specialty_map.get(token)
+            # if still not mapped, title-case the original suggestion to use in search
+            if not mapped_specialty:
+                mapped_specialty = recommended_specialty
+        if mapped_specialty:
+            # use mapped_specialty for search
+            search_specialty = mapped_specialty
+        else:
+            search_specialty = None
         if recommended_specialty:
             try:
                 query = supabase.table("doctors") \
@@ -230,23 +231,31 @@ def analyze_symptoms(request):
                         doctor_specialties!inner(
                             specialties!inner(name)
                         )
-                    """) \
-                    .ilike("doctor_specialties.specialties.name", f"%{recommended_specialty}%")
+                    """)
 
-                # Add location filter for 2km radius (approximate bounding box)
-                if user_lat is not None and user_lng is not None:
-                    # Approximate 2km: ~0.018 degrees lat, lng adjusted
-                    lat_delta = 0.018
-                    lng_delta = 0.018 / math.cos(math.radians(user_lat)) if user_lat != 0 else 0.018
-                    query = query \
-                        .gte("latitude", user_lat - lat_delta) \
-                        .lte("latitude", user_lat + lat_delta) \
-                        .gte("longitude", user_lng - lng_delta) \
-                        .lte("longitude", user_lng + lng_delta)
+                # choose mapped search specialty if available
+                search_term = search_specialty if search_specialty is not None else recommended_specialty
+                query = query.ilike("doctor_specialties.specialties.name", f"%{search_term}%")
+
+                # Location filter (5km bounding box) temporarily disabled — enable if needed
+                # if user_lat is not None and user_lng is not None:
+                #     # 1 degree latitude ~= 111.32 km
+                #     lat_delta = 5.0 / 111.32
+                #     # longitude delta adjusted by latitude
+                #     try:
+                #         lng_delta = 5.0 / (111.32 * math.cos(math.radians(float(user_lat)))) if float(user_lat) != 0 else lat_delta
+                #     except Exception:
+                #         lng_delta = lat_delta
+
+                #     query = query \
+                #         .gte("latitude", user_lat - lat_delta) \
+                #         .lte("latitude", user_lat + lat_delta) \
+                #         .gte("longitude", user_lng - lng_delta) \
+                #         .lte("longitude", user_lng + lng_delta)
 
                 doctors_data = query \
                     .order("experience", desc=True) \
-                    .limit(3) \
+                    .limit(10) \
                     .execute()
 
                 if doctors_data.data:
@@ -256,15 +265,18 @@ def analyze_symptoms(request):
                             "clinic_name": doc.get("clinic_name"),
                             "experience": doc.get("experience"),
                             "phone": doc.get("phone"),
-                            "consultation_fee": doc.get("consultation_fee")
+                            "consultation_fee": doc.get("consultation_fee"),
+                            "latitude": doc.get("latitude"),
+                            "longitude": doc.get("longitude")
                         })
             except Exception as e:
                 print(f"Error fetching doctors: {e}")
                 doctors_list = []
 
         # ...after building doctors_list and before returning...
-        # reply_json["recommended_doctors"] = doctors_list
-        reply_json["recommended_specialization"] = recommended_specialty  # <-- Add this line
+        # Include the recommended doctors (if any) and the specialty in the response
+        reply_json["recommended_doctors"] = doctors_list
+        reply_json["recommended_specialization"] = recommended_specialty
 
         # Insert symptom session record
         try:
@@ -306,80 +318,6 @@ def analyze_symptoms(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
-# -----------------------------
-# Conversation management endpoints
-# -----------------------------
-
-# Create or return conversation (optionally pass auth_id)
-@api_view(["POST"])
-def create_conversation(request):
-    auth_id = request.data.get("auth_id")
-    metadata = request.data.get("metadata", {})
-    # Optionally you could try to find an existing open conversation for auth_id
-    convo = Conversation.objects.create(auth_id=auth_id, metadata=metadata)
-    return Response(ConversationSerializer(convo).data, status=status.HTTP_201_CREATED)
-
-# Append a message to a conversation (frontend calls for user and also saves ai messages)
-@api_view(["POST"])
-def append_message(request):
-    conv_id = request.data.get("conversation_id")
-    role = request.data.get("role")
-    text = request.data.get("text")
-    meta = request.data.get("meta", {})
-
-    if not conv_id or not role or text is None:
-        return Response({"error": "conversation_id, role and text required"},
-                        status=status.HTTP_400_BAD_REQUEST)
-
-    conversation = get_object_or_404(Conversation, pk=conv_id)
-
-    # Update stage ONLY if it's a user message
-    if role == "user":
-        old_stage = conversation.conversation_stage
-        new_stage = get_next_stage(old_stage, text)
-        conversation.conversation_stage = new_stage
-        conversation.save()
-
-    msg = Message.objects.create(
-        conversation=conversation, role=role, text=text, meta=meta
-    )
-
-    return Response(MessageSerializer(msg).data, status=status.HTTP_201_CREATED)
-
-    """
-    body: { conversation_id: <uuid>, role: "user"|"ai"|"system", text: "...", meta: {...} }
-    """
-    conv_id = request.data.get("conversation_id")
-    role = request.data.get("role")
-    text = request.data.get("text")
-    meta = request.data.get("meta", {})
-
-    if not conv_id or not role or text is None:
-        return Response({"error": "conversation_id, role and text required"}, status=status.HTTP_400_BAD_REQUEST)
-
-    conversation = get_object_or_404(Conversation, pk=conv_id)
-    msg = Message.objects.create(conversation=conversation, role=role, text=text, meta=meta)
-    return Response(MessageSerializer(msg).data, status=status.HTTP_201_CREATED)
-
-# Get conversation history (with optional limit)
-@api_view(["GET"])
-def conversation_history(request, convo_id):
-    limit = int(request.query_params.get("limit", 100))
-    conversation = get_object_or_404(Conversation, pk=convo_id)
-    qs = conversation.messages.all().order_by("created_at")[:limit]
-    data = MessageSerializer(qs, many=True).data
-    return Response({"conversation": conversation.id, "messages": data})
-
-# Helper: load last N messages as plain text for LLM context
-def load_recent_messages_for_llm(conversation_id, limit=10):
-    conversation = Conversation.objects.get(pk=conversation_id)
-    qs = conversation.messages.all().order_by("-created_at")[:limit]  # latest first
-    # produce ordered oldest->newest
-    msgs = list(reversed(list(qs)))
-    # convert to simple list of dicts or string
-    history = [{"role": m.role, "text": m.text} for m in msgs]
-    return history
 
 # -----------------------------
 # Helper endpoint: list available Gemini models

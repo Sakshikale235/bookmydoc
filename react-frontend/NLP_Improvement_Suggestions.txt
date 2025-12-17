@@ -1,0 +1,89 @@
+# NLP Pipeline Improvements for Handling Symptoms with Typos
+
+## Current Issues:
+- Limited medical mappings in medicalMap.ts
+- Spell corrector only handles known words
+- No fuzzy matching for typos
+- No context-aware corrections
+
+## Recommended Improvements:
+
+### 1. Enhanced Medical Dictionary
+- Expand medicalMap.ts with comprehensive symptom mappings:
+  - Common typos: "fevr" -> "fever", "hedache" -> "headache", "stomache" -> "stomach"
+  - Variations: "high temp" -> "fever", "running nose" -> "runny nose"
+  - Abbreviations: "BP" -> "blood pressure", "BP high" -> "hypertension"
+
+### 2. Fuzzy String Matching
+- Implement Levenshtein distance for typo correction:
+  - For words not in exact maps, find closest medical term within edit distance of 2
+  - Example: "fevr" (4 chars) -> check against ["fever", "feverish", "fevered"]
+
+### 3. Context-Aware Correction
+- Use surrounding words for better correction:
+  - "i have pain in my hed" -> "head" (context: "pain in my")
+  - "my stomache hurts" -> "stomach" (context: "hurts")
+
+### 4. Symptom Pattern Recognition
+- Look for symptom-indicating phrases:
+  - "i have", "i'm feeling", "i suffer from", "pain in", "hurts"
+  - Followed by potential symptoms or descriptions
+
+### 5. Multi-Language Support
+- Add Hinglish/Regional language mappings:
+  - "bukhar" -> "fever", "kharash" -> "rash", "sirdard" -> "headache"
+  - "pet mein dard" -> "stomach pain", "chakkar aa raha hai" -> "dizziness"
+
+### 6. Dynamic Learning
+- Implement user feedback loop:
+  - Track unrecognized inputs that lead to symptom confirmation
+  - Add them to mappings over time
+  - Use machine learning for pattern recognition
+
+### 7. Symptom Extraction Algorithm
+```
+function extractSymptoms(text):
+  - Tokenize and normalize input
+  - Check exact matches in medicalMap
+  - Apply fuzzy matching for unmatched words
+  - Use regex patterns for symptom phrases
+  - Validate against known symptom database
+  - Return list of detected symptoms
+```
+
+### 8. Confidence Scoring
+- Assign confidence scores to detections:
+  - Exact match: 1.0
+  - Fuzzy match (1 edit): 0.8
+  - Fuzzy match (2 edits): 0.6
+  - Ask for confirmation if confidence < 0.7
+
+### 9. Integration Points
+- Connect with medical APIs for validation
+- Use pre-trained medical NLP models
+- Implement symptom clustering (e.g., "headache + nausea" -> "migraine")
+
+### 10. Testing Strategy
+- Create comprehensive test cases:
+  - Common typos: "fevr", "hedache", "stomache"
+  - Variations: "high temperature", "stomach ache", "chest pain"
+  - Hinglish: "bukhar", "kharash", "sirdard"
+  - Edge cases: "i have a bad hed", "my stomache is hurting"
+
+## Implementation Priority:
+1. **Enhanced Medical Dictionary** - Expand medicalMap.ts with comprehensive symptom mappings (highest priority - directly impacts accuracy)
+2. **Fuzzy String Matching** - Implement Levenshtein distance for typo correction (critical for handling common misspellings)
+3. **Context-Aware Correction** - Use surrounding words for better correction (improves precision in ambiguous cases)
+4. **Symptom Pattern Recognition** - Look for symptom-indicating phrases (enhances detection of complex inputs)
+5. **Multi-Language Support** - Add Hinglish/Regional language mappings (essential for diverse user base)
+6. **Confidence Scoring** - Assign confidence scores to detections (prevents false positives)
+7. **Symptom Extraction Algorithm** - Refine the core extraction logic (optimizes overall performance)
+8. **Dynamic Learning** - Implement user feedback loop (long-term improvement)
+9. **Integration Points** - Connect with medical APIs for validation (adds robustness)
+10. **Testing Strategy** - Create comprehensive test cases (ensures quality)
+
+## Benefits:
+- Higher accuracy in symptom detection
+- Better user experience with fewer failed interactions
+- Support for diverse user inputs (typos, languages)
+- Scalable system that learns over time

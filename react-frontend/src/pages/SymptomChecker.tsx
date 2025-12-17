@@ -17,6 +17,7 @@ const SymptomChecker: React.FC = () =>  {
   const chatbotRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLDivElement>(null);
   const symptomsRef = useRef<HTMLUListElement>(null);
+  const chatbotComponentRef = useRef<any>(null);
 
   useEffect(() => {
     const tl = gsap.timeline({ defaults: { duration: 1, ease: "power3.out" } });
@@ -77,10 +78,10 @@ const SymptomChecker: React.FC = () =>  {
         <Navigation />
       </div>
       <div id="seasonal" ref={seasonalRef}>
-        <SeasonalHealth />
+        <SeasonalHealth chatbotRef={chatbotComponentRef} />
       </div>
       <div id="chatbot" ref={chatbotRef}>
-        <Chatbot />
+        <Chatbot ref={chatbotComponentRef} />
       </div>
       <div ref={footerRef}>
         <Footer />

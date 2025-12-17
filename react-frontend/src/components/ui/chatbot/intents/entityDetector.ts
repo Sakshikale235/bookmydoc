@@ -1,95 +1,166 @@
-// entityDetector.ts
-import { correctSentence, correctWord, PHRASE_MAP } from "./keywordCorrection";
-// import { PHRASE_MAP } from "./phraseCorrections";
+// IMPROVED ENTITY DETECTOR (STEP 3)
+// Uses: normalizeText(), correctWord(), PHRASE_MAP, validators, and fuzzy symptom matching.
 
-type Extracted = {
+import { normalizeText, correctWord, PHRASE_MAP } from "./keywordCorrection";
+import {
+  normalizeGender,
+  validateSymptom,
+  validateDuration,
+  validateIntensity,
+} from "./validators";
+
+export type ExtractedEntities = {
   age?: number | null;
   gender?: string | null;
   symptoms?: string[];
   duration?: string | null;
   intensity?: string | null;
   location?: string | null;
-  raw?: string;
+  raw: string;
 };
 
-const GENDER_WORDS = ["male","female","trans","non-binary","other"];
-const DURATION_REGEX = /\b(\d+)\s*(days?|day|weeks?|week|months?|month|hrs|hours?)\b/i;
-const AGE_REGEX = /\b(\d{1,2})\s*(years?|yrs|yr|y)\b/i;
-const INTENSITY_WORDS = ["mild","moderate","severe","slight","sharp","dull"];
+// ----------------------------------------
+// Regex Definitions
+// ----------------------------------------
+const AGE_REGEX = /\b(\d{1,2})\s*(year|years|yr|yrs|y)\b/i;
 
-function applyPhraseMap(text: string) {
-  const t = text.toLowerCase();
-  // longest-first replacement
-  const keys = Object.keys(PHRASE_MAP).sort((a,b) => b.length - a.length);
-  let out = t;
-  for (const k of keys) {
-    if (out.includes(k)) out = out.replace(new RegExp(k, "g"), PHRASE_MAP[k]);
+// Hinglish duration support added
+const DURATION_REGEX =
+  /\b(\d+)\s*(day|days|week|weeks|month|months|hour|hours|hr|hrs|din|mahine)\b/i;
+
+const INTENSITY_WORDS = ["mild", "moderate", "severe", "slight", "sharp", "dull"];
+
+const LOCATION_REGEX = /\bin\s+([a-zA-Z0-9\s,]+)/i;
+
+// Unified symptom list (base dictionary)
+const SYMPTOM_KEYWORDS = [
+  "fever",
+  "cold",
+  "cough",
+  "headache",
+  "migraine",
+  "pain",
+  "abdominal pain",
+  "stomach pain",
+  "burning urination",
+  "vomiting",
+  "nausea",
+  "diarrhea",
+  "chills",
+  "itching",
+  "rash",
+  "fatigue",
+  "dizziness",
+  "sore throat",
+  "breathlessness",
+  "shortness of breath",
+];
+
+// ----------------------------------------
+// MAIN EXTRACTOR
+// ----------------------------------------
+export function extractEntities(rawMessage: string): ExtractedEntities {
+  if (!rawMessage || rawMessage.trim() === "") {
+    return { raw: rawMessage };
   }
-  return out;
-}
 
-export function extractEntities(message: string): Extracted {
-  if (!message) return { raw: message };
+  // 1. Use the already normalized text passed from processChatMessage
+  const text = rawMessage;
 
-  // 1) phrase normalize
-  let text = applyPhraseMap(message);
-
-  // 2) typo-correct the sentence (preserves numbers)
-  text = correctSentence(text);
-
-  // 3) extract age
+  // ----------------------------------------
+  // AGE
+  // ----------------------------------------
+  let age: number | null = null;
   const ageMatch = text.match(AGE_REGEX);
-  const age = ageMatch ? parseInt(ageMatch[1], 10) : undefined;
+  if (ageMatch) {
+    age = parseInt(ageMatch[1]);
+    if (age < 1 || age > 119) age = null;
+  }
 
-  // 4) extract duration
-  const durMatch = text.match(DURATION_REGEX);
-  const duration = durMatch ? durMatch[0] : undefined;
+  // ----------------------------------------
+  // GENDER (normalized: m → male, f → female, etc.)
+  // ----------------------------------------
+  let gender: string | null = normalizeGender(text);
 
-  // 5) detect genders (prefer explicit words)
-  let gender: string | undefined;
-  for (const g of GENDER_WORDS) {
-    if (text.includes(g)) {
-      gender = g;
+  // ----------------------------------------
+  // DURATION ("2 days", "3 din", "1 week")
+  // ----------------------------------------
+  let duration: string | null = null;
+  const durationMatch = text.match(DURATION_REGEX);
+  if (durationMatch) {
+    const d = durationMatch[0].trim();
+    if (validateDuration(d)) duration = d;
+  }
+
+  // ----------------------------------------
+  // INTENSITY ("mild", "severe", "sharp pain")
+  // ----------------------------------------
+  let intensity: string | null = null;
+  for (const i of INTENSITY_WORDS) {
+    if (text.includes(i)) {
+      if (validateIntensity(i)) intensity = i;
       break;
     }
   }
 
-  // 6) detect symptoms: pick tokens that are in dictionary or common symptom patterns
-  // We will split, filter stopwords, and check corrected tokens against dictionary buckets (via correctWord)
-  const tokens = text.split(/\s+/).map(t => t.replace(/[^\w-]/g,"").toLowerCase()).filter(Boolean);
-  const symptomCandidates = new Set<string>();
-  const symptomKeywords = ["fever","cough","cold","burning","pain","headache","vomiting","nausea","diarrhea","dizziness","chills","sore","throat","urinary","frequency","urine","bleeding","rash","itching","shortness","breath","palpitation","anxiety","fatigue"];
-
-  for (let i = 0; i < tokens.length; i++) {
-    // check 2-gram (phrase) too
-    const two = tokens[i] && tokens[i+1] ? `${tokens[i]} ${tokens[i+1]}` : null;
-    if (two && symptomKeywords.some(k => two.includes(k))) symptomCandidates.add(two);
-    const t = tokens[i];
-    if (symptomKeywords.some(k => t.includes(k))) symptomCandidates.add(t);
-    // also run correction and check full match
-    const corr = correctWord(t);
-    if (symptomKeywords.some(k => corr.includes(k))) symptomCandidates.add(corr);
+  // ----------------------------------------
+  // LOCATION ("in Mumbai", "in Delhi sector 15")
+  // ----------------------------------------
+  let location: string | null = null;
+  const locMatch = text.match(LOCATION_REGEX);
+  if (locMatch) {
+    location = locMatch[1].trim();
   }
 
-  // Assemble symptoms array
-  const symptoms = Array.from(symptomCandidates).map(s => s.replace(/_+/g," ").trim());
-
-  // 7) intensity detection
-  let intensity: string | undefined;
-  for (const intW of INTENSITY_WORDS) if (text.includes(intW)) { intensity = intW; break; }
-
-  // 8) location extraction (simple "in <place>" or after address)
-  let location: string | undefined;
-  const locMatch = text.match(/\bin\s+([a-zA-Z0-9\s,]+)/i);
-  if (locMatch) location = locMatch[1].trim();
+  // ----------------------------------------
+  // SYMPTOMS — multiword + fuzzy + corrected
+  // ----------------------------------------
+  const symptoms = extractSymptoms(text);
 
   return {
-    age: age ?? null,
-    gender: gender ?? null,
+    age,
+    gender,
+    duration,
+    intensity,
+    location,
     symptoms: symptoms.length ? symptoms : undefined,
-    duration: duration ?? null,
-    intensity: intensity ?? null,
-    location: location ?? null,
-    raw: message
+    raw: rawMessage,
   };
+}
+
+// ----------------------------------------
+// SYMPTOM LOGIC
+// ----------------------------------------
+function extractSymptoms(text: string): string[] {
+  const tokens = text.split(/\s+/);
+
+  const detected = new Set<string>();
+
+  // 1. Multiword symptoms from phrase map
+  for (const phrase in PHRASE_MAP) {
+    if (text.includes(phrase)) {
+      detected.add(PHRASE_MAP[phrase]);
+    }
+  }
+
+  // 2. Check 1-word and 2-word tokens
+  for (let i = 0; i < tokens.length; i++) {
+    const one = correctWord(tokens[i]);
+
+    // Single token symptoms
+    if (SYMPTOM_KEYWORDS.includes(one)) {
+      detected.add(one);
+    }
+
+    // Pair token symptoms
+    if (i < tokens.length - 1) {
+      const two = `${one} ${correctWord(tokens[i + 1])}`;
+      if (SYMPTOM_KEYWORDS.includes(two)) detected.add(two);
+    }
+  }
+
+  // 3. Remove non-symptoms + keep validated ones
+  return Array.from(detected)
+    .map((s) => s.trim())
+    .filter((s) => validateSymptom(s));
 }
