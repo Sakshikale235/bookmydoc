@@ -17,10 +17,10 @@ const Navigation = () => {
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const navItems = [
-    { id: "home", label: "Home", href: "#index" },
+    { id: "home", label: "Home", href: "/index" },
     { id: "services", label: "Treatment", href: "#services" },
     { id: "doctors", label: "Our Doctors", href: "#doctors" },
-    { id: "about", label: "About", href: "#about" },
+    { id: "about", label: "About", href: "/about" },
   ];
 
   const isSymptomCheckerPage = location.pathname === "/symptom_checker";
