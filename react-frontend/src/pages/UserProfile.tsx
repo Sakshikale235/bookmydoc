@@ -52,16 +52,17 @@ export default function UserProfile() {
   const [uploadErrorMsg, setUploadErrorMsg] = useState<string | null>(null);
 
   interface Appointment {
-    id: number;
-    appointment_date: string;
-    status: string;
-    reason: string;
-    doctor: {
-      full_name: string;
-      specialization: string;
-      clinic_name: string;
-    } | null;
-  }
+  id: number;
+  appointment_date: string;
+  status: string;
+  reason: string;
+  doctor_id: string; // ✅ ADD THIS
+  doctor: {
+    full_name: string;
+    specialization: string;
+    clinic_name: string;
+  } | null;
+}
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   // Fetch live appointments for the logged-in patient
@@ -70,7 +71,7 @@ export default function UserProfile() {
       if (!user || !user.id) return;
       const { data, error } = await supabase
         .from('appointments')
-        .select(`id, appointment_date, status, reason, doctor:doctors(full_name, specialization, clinic_name)`)
+        .select(`id, appointment_date, status, reason, doctor_id, doctor:doctors(full_name, specialization, clinic_name)`)
         .eq('patient_id', user.id)
         .order('appointment_date', { ascending: false });
       if (error) {
@@ -82,6 +83,7 @@ export default function UserProfile() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (data || []).map((appt: any) => ({
           ...appt,
+          status: appt.status?.trim().toLowerCase(),
           doctor: Array.isArray(appt.doctor) ? appt.doctor[0] : appt.doctor,
         }))
       );
@@ -306,19 +308,72 @@ export default function UserProfile() {
     );
   };
 
+  const handleCancelAppointment = async (appointment: Appointment) => {
+  const confirmCancel = window.confirm("Are you sure you want to cancel this appointment?");
+  if (!confirmCancel) return;
+
+  try {
+    // 1️⃣ Update appointment status
+    const { error: updateError } = await supabase
+      .from("appointments")
+      .update({ status: "cancelled" })
+      .eq("id", appointment.id);
+
+    if (updateError) throw updateError;
+
+    // 2️⃣ DEBUG LOGS (VERY IMPORTANT)
+    console.log("Patient ID (sender):", user?.id);
+    console.log("Doctor ID (receiver):", appointment.doctor_id);
+
+    // 3️⃣ Insert notification
+    const { data, error } = await supabase
+      .from("notifications")
+      .insert({
+        sender_id: user?.id,                 // patient
+        receiver_id: appointment.doctor_id,  // doctor
+        message: `Appointment on ${new Date(
+          appointment.appointment_date
+        ).toLocaleString()} was cancelled by the patient.`,
+        type: "appointment_cancelled",
+        is_read: false,
+      })
+      .select();
+
+    console.log("Notification insert result:", { data, error });
+
+    if (error) {
+      alert("⚠️ Appointment cancelled, but notification failed.");
+    } else {
+      alert("✅ Appointment cancelled successfully.");
+    }
+
+    // 4️⃣ Update UI immediately
+    setAppointments(prev =>
+      prev.map(a =>
+        a.id === appointment.id ? { ...a, status: "cancelled" } : a
+      )
+    );
+  } catch (err) {
+    console.error("Cancel appointment error:", err);
+    alert("❌ Failed to cancel appointment.");
+  }
+};
+
+
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'upcoming':
-        return 'bg-blue-100 text-blue-800';
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  switch (status) {
+    case 'confirmed':
+      return 'bg-blue-100 text-blue-800';
+    case 'pending':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'cancelled':
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
+
 
   if (loading) {
     return (
@@ -720,22 +775,22 @@ export default function UserProfile() {
                                 </div>
                               </div>
                               <div className="flex space-x-2">
-                                {appointment.status === 'scheduled' && (
-                                  <>
-                                    <button className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-medium hover:bg-green-200 transition-colors">
-                                      Reschedule
-                                    </button>
-                                    <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors">
-                                      Cancel
-                                    </button>
-                                  </>
-                                )}
-                                {appointment.status === 'completed' && (
-                                  <button className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-200 transition-colors">
-                                    View Report
-                                  </button>
-                                )}
-                              </div>
+  {(appointment.status === "confirmed" ||
+    appointment.status === "pending") && (
+    <button
+      onClick={() => handleCancelAppointment(appointment)}
+      className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-medium hover:bg-red-200 transition-colors"
+    >
+      Cancel
+    </button>
+  )}
+
+  {appointment.status === "completed" && (
+    <button className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-200 transition-colors">
+      View Report
+    </button>
+  )}
+</div>
                             </div>
                           </div>
                         );

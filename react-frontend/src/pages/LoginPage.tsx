@@ -18,6 +18,7 @@ const LoginPage: React.FC = () => {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regShowPassword, setRegShowPassword] = useState(false); // ⭐ added
+  const [selectedRoleUI, setSelectedRoleUI] = useState<"patient" | "doctor">("patient");
 
   // LOCATION STATES
   const [locationChecked, setLocationChecked] = useState(false);
@@ -276,6 +277,7 @@ const LoginPage: React.FC = () => {
   const toggleRightStyles: React.CSSProperties = { ...togglePanelStyles, right: isActive ? 0 : "-50%", transitionDelay: isActive ? "1.2s" : "0.6s" };
   const togglePanelPStyles: React.CSSProperties = { marginBottom: "20px" };
   const toggleBtnStyles: React.CSSProperties = { width: "160px", height: "46px", background: "transparent", border: "2px solid #fff", borderRadius: "8px", cursor: "pointer", fontSize: "16px", color: "#fff", fontWeight: 600 };
+  const roleBtn = (active: boolean): React.CSSProperties => ({flex: 1,padding: "10px",borderRadius: "20px",border: active ? "2px solid #2D9CDB" : "2px solid #ccc",background: active ? "#2D9CDB" : "transparent",color: active ? "#fff" : "#333",fontWeight: 600,cursor: "pointer",transition: "0.3s",});
 
   // MOBILE MEDIA QUERIES: hide desktop section, show mobile section
   const mediaQueries = `
@@ -394,6 +396,7 @@ const LoginPage: React.FC = () => {
             <form style={{ width: "100%", maxWidth: 420, margin: "0 auto", overflowY: "auto", maxHeight: "100vh", paddingBottom: 80 }} onSubmit={handleRegister}>
               <h1 style={{ fontSize: 28, margin: "8px 0", textAlign: "center" }}>Register</h1>
 
+
               <div style={inputBoxStyles}>
                 <input type="text" placeholder="Name" required style={{ ...inputStyles, padding: "12px 40px 12px 12px" }} value={regName} onChange={(e) => setRegName(e.target.value)} />
                 <i className="bx bxs-user" style={iconStyles}></i>
@@ -438,6 +441,26 @@ const LoginPage: React.FC = () => {
                   I allow this app to access my location for health insights.
                 </label>
               </div>
+
+              {/* ===== Role Selection (UI only) ===== */}
+<div style={{ display: "flex", gap: 12, margin: "15px 0" }}>
+  <button
+    type="button"
+    style={roleBtn(selectedRoleUI === "patient")}
+    onClick={() => setSelectedRoleUI("patient")}
+  >
+    Patient
+  </button>
+
+  <button
+    type="button"
+    style={roleBtn(selectedRoleUI === "doctor")}
+    onClick={() => setSelectedRoleUI("doctor")}
+  >
+    Doctor
+  </button>
+</div>
+
 
               <button type="submit" style={btnStyles} disabled={loading}>
                 {loading ? "Please wait..." : "Register"}
@@ -563,6 +586,26 @@ const LoginPage: React.FC = () => {
                 <input type="checkbox" id="location" required style={checkboxInputStyles} checked={locationChecked} onChange={(e) => handleLocationAccess(e.target.checked)} />
                 <label htmlFor="location" style={checkboxLabelStyles}>I allow this app to access my location for health insights.</label>
               </div>
+
+              {/* ===== Role Selection (UI only) ===== */}
+<div style={{ display: "flex", gap: 12, margin: "15px 0" }}>
+  <button
+    type="button"
+    style={roleBtn(selectedRoleUI === "patient")}
+    onClick={() => setSelectedRoleUI("patient")}
+  >
+    Patient
+  </button>
+
+  <button
+    type="button"
+    style={roleBtn(selectedRoleUI === "doctor")}
+    onClick={() => setSelectedRoleUI("doctor")}
+  >
+    Doctor
+  </button>
+</div>
+
 
               <button type="submit" style={btnStyles} disabled={loading}>
                 {loading ? "Please wait..." : "Register"}
