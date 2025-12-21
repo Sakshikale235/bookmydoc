@@ -14,6 +14,7 @@ export type IntentType =
   | "greeting"
   | "yes"
   | "no"
+  | "thanks"
   | "other";
 
 export type DetectedIntent = {
@@ -39,6 +40,8 @@ const GREETINGS = ["hi", "hello", "hey", "good morning", "good evening"];
 
 const YES_WORDS = ["yes", "ok", "okay", "sure"];
 const NO_WORDS = ["no", "not", "never"];
+
+const THANKS_WORDS = ["thanks", "thank you", "thankyou", "thx"];
 
 const PROFILE_FIELDS = [
   "age",
@@ -146,6 +149,13 @@ export function detectIntent(
   // -----------------------------
   if (GREETINGS.some(g => text.startsWith(g))) {
     return { type: "greeting", confidence: 0.9 };
+  }
+
+  // -----------------------------
+  // 3.5 Thanks
+  // -----------------------------
+  if (words.length <= 3 && THANKS_WORDS.some(t => text.includes(t))) {
+    return { type: "thanks", confidence: 0.9 };
   }
 
   // -----------------------------

@@ -26,6 +26,7 @@ export interface ConversationContext {
   };
 
   fieldToUpdate?: string;
+  sessionId?: string;
 }
 
 export function createInitialContext(): ConversationContext {

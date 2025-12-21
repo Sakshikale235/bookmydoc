@@ -89,11 +89,25 @@ export function processChatMessage(
             `Location: ${p?.address ?? "Not provided"}\n\n` +
             `Are these correct? (yes / no)`;
 
+        // Create session for first symptom
+        const sessionData = {
+            symptoms: newContext.collected.symptoms ?? [],
+            age: newContext.collected.age,
+            gender: newContext.collected.gender,
+            height: newContext.collected.height,
+            weight: newContext.collected.weight,
+            location: newContext.collected.location
+        };
+
         return {
             reply:
                 "Okay, I’ve noted your symptom.\nFor better analysis, please confirm your profile details.\n\n" +
                 profileText,
-            context: newContext
+            context: newContext,
+            backendRequest: {
+                endpoint: "/create-symptom-session/",
+                data: sessionData
+            }
         };
     }
 
@@ -105,6 +119,18 @@ export function processChatMessage(
 
         return {
             reply: "Hi 😊 How can I help you today?",
+            context: prevContext
+        };
+    }
+
+    // -----------------------------
+    // THANKS INTENT
+    // -----------------------------
+    if (intent.type === "thanks") {
+        console.log("🙏 THANKS RETURN EXECUTED");
+
+        return {
+            reply: "You're welcome! Feel free to ask if you need anything else.",
             context: prevContext
         };
     }

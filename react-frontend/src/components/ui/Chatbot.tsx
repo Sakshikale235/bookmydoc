@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle } from "react";
-import { Bot, Send } from "lucide-react";
+import { Bot, Send, RotateCcw } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { analyzeSymptoms } from "../../lib/api";
 // CORE BRAIN
@@ -17,6 +17,7 @@ type Message = {
   text: string;
   action?: { label: string; url: string };
   isTyping?: boolean;
+  isAnalyzing?: boolean;
   sender: "user" | "ai";
 };
 
@@ -36,8 +37,147 @@ const [hasGreeted, setHasGreeted] = useState(false);
   const [context, setContext] =
     useState<ConversationContext>(createInitialContext());
 
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedMessages = localStorage.getItem('chatbot_messages');
+      const savedContext = localStorage.getItem('chatbot_context');
+      const savedHasGreeted = localStorage.getItem('chatbot_has_greeted');
+
+      if (savedMessages) {
+        const parsedMessages = JSON.parse(savedMessages);
+        setMessages(parsedMessages);
+
+        // Update messageId ref to continue from the highest ID
+        if (parsedMessages.length > 0) {
+          const maxId = Math.max(...parsedMessages.map((m: Message) => parseInt(m.id)));
+          messageId.current = maxId + 1;
+        }
+      }
+
+      if (savedContext) {
+        const parsedContext = JSON.parse(savedContext);
+        setContext(parsedContext);
+      }
+
+      if (savedHasGreeted) {
+        setHasGreeted(JSON.parse(savedHasGreeted));
+      }
+    } catch (error) {
+      console.warn('Failed to load chat history from localStorage:', error);
+    }
+  }, []);
+
+  // Save chat history to localStorage whenever messages, context, or hasGreeted change
+  useEffect(() => {
+    try {
+      localStorage.setItem('chatbot_messages', JSON.stringify(messages));
+    } catch (error) {
+      console.warn('Failed to save messages to localStorage:', error);
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('chatbot_context', JSON.stringify(context));
+    } catch (error) {
+      console.warn('Failed to save context to localStorage:', error);
+    }
+  }, [context]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('chatbot_has_greeted', JSON.stringify(hasGreeted));
+    } catch (error) {
+      console.warn('Failed to save hasGreeted to localStorage:', error);
+    }
+  }, [hasGreeted]);
+
   const messageId = useRef(1);
-const chatRef = useRef<HTMLDivElement | null>(null);
+  const chatRef = useRef<HTMLDivElement | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+
+  // Function to create/initialize a symptom session
+  const createSymptomSession = async (): Promise<string | null> => {
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth?.user) return null;
+
+      const { data: patient } = await supabase
+        .from("patients")
+        .select("id")
+        .eq("auth_id", auth.user.id)
+        .single();
+
+      if (!patient) return null;
+
+      const { data: session, error } = await supabase
+        .from("symptom_sessions")
+        .insert({
+          patient_id: patient.id,
+          started_at: new Date(),
+          messages: []
+        })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+      return session?.id || null;
+    } catch (err) {
+      console.error("Failed to create symptom session:", err);
+      return null;
+    }
+  };
+
+  // Function to save a message to the session
+  const saveMessageToSession = async (message: Message) => {
+    try {
+      if (!sessionIdRef.current) return;
+
+      const { data: currentSession } = await supabase
+        .from("symptom_sessions")
+        .select("messages")
+        .eq("id", sessionIdRef.current)
+        .single();
+
+      const existingMessages = currentSession?.messages || [];
+
+      const newMessages = [
+        ...existingMessages,
+        {
+          id: message.id,
+          sender: message.sender,
+          text: message.text,
+          timestamp: new Date()
+        }
+      ];
+
+      await supabase
+        .from("symptom_sessions")
+        .update({ messages: newMessages })
+        .eq("id", sessionIdRef.current);
+    } catch (err) {
+      console.warn("Failed to save message to session:", err);
+    }
+  };
+
+  // Function to update session with analysis results
+  const updateSessionWithAnalysis = async (analysis: any) => {
+    try {
+      if (!sessionIdRef.current) return;
+
+      await supabase
+        .from("symptom_sessions")
+        .update({
+          analysis_result: analysis,
+          ended_at: new Date(),
+          personal_info: context.patientProfile || null
+        })
+        .eq("id", sessionIdRef.current);
+    } catch (err) {
+      console.error("Failed to update session with analysis:", err);
+    }
+  };
 
   // Expose method to send disease message
   useImperativeHandle(ref, () => ({
@@ -75,21 +215,34 @@ useEffect(() => {
 
   useEffect(() => {
   async function fetchPatient() {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth?.user) return;
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      console.log("Auth data:", auth);
+      if (!auth?.user) {
+        console.log("No user logged in");
+        return;
+      }
 
-    const { data } = await supabase
-      .from("patients")
-      .select("age, gender, height, weight, address")
-      .eq("auth_id", auth.user.id)
-      .single();
+      const { data, error } = await supabase
+        .from("patients")
+        .select("age, gender, height, weight, address")
+        .eq("auth_id", auth.user.id)
+        .single();
 
-      
-    if (data) {
-      setContext(prev => ({
-        ...prev,
-        patientProfile: data
-      }));
+      console.log("Patient data:", data);
+      console.log("Patient error:", error);
+
+      if (data) {
+        setContext(prev => ({
+          ...prev,
+          patientProfile: data
+        }));
+        console.log("Patient profile set in context:", data);
+      } else {
+        console.log("No patient data found");
+      }
+    } catch (err) {
+      console.error("Error fetching patient:", err);
     }
   }
 
@@ -101,29 +254,34 @@ useEffect(() => {
      Helpers
   ----------------------------------- */
   const pushUserMessage = (text: string) => {
+    const newMessage: Message = {
+      id: (messageId.current++).toString(),
+      text,
+      sender: "user"
+    };
     setMessages(prev => [
       ...prev,
-      {
-        id: (messageId.current++).toString(),
-        text,
-        sender: "user"
-      }
+      newMessage
     ]);
+    // Save to session async (non-blocking)
+    saveMessageToSession(newMessage);
   };
 
   // AI queue + typewriter support
-  const [aiQueue, setAiQueue] = useState<Array<{ text: string; action?: { label: string; url: string } }>>([]);
+  const [aiQueue, setAiQueue] = useState<Array<{ text: string; action?: { label: string; url: string }; isAnalyzing?: boolean }>>([]);
   const [isTyping, setIsTyping] = useState(false);
   const typingIntervalRef = useRef<number | null>(null);
   const isProcessingRef = useRef(false);
   const [showTypingIndicator, setShowTypingIndicator] = useState(false);
+  const [analyzingTyping, setAnalyzingTyping] = useState(false);
+  const [analyzingDots, setAnalyzingDots] = useState(".");
 
-  const queueAIMessage = (text: string, action?: { label: string; url: string }) => {
-    setAiQueue(prev => [...prev, { text, action }]);
+  const queueAIMessage = (text: string, action?: { label: string; url: string }, isAnalyzing?: boolean) => {
+    setAiQueue(prev => [...prev, { text, action, isAnalyzing }]);
   };
 
   // enqueue helpers (used across the component)
-  const pushAIMessage = (text: string) => queueAIMessage(text);
+  const pushAIMessage = (text: string, isAnalyzing?: boolean) => queueAIMessage(text, undefined, isAnalyzing);
   const pushAIActionMessage = (text: string, label: string, url: string) => queueAIMessage(text, { label, url });
 
   // Worker: process aiQueue sequentially
@@ -143,15 +301,19 @@ useEffect(() => {
       const typingId = (messageId.current++).toString();
       setMessages(prev => [
         ...prev,
-        { id: typingId, text: '', sender: 'ai', isTyping: true }
+        { id: typingId, text: '', sender: 'ai', isTyping: true, isAnalyzing: item.isAnalyzing }
       ]);
 
-      // Show typing indicator during 5 second delay
+      // Show typing indicator during delay
       setShowTypingIndicator(true);
 
-      // WAIT 5 seconds before starting to type
+      // WAIT before starting to type (for analyzing messages, keep indicator on)
       await new Promise(res => setTimeout(res, 1000));
-      setShowTypingIndicator(false);
+      
+      // Only turn off typing indicator if NOT analyzing (analyzing will turn it off when API returns)
+      if (!item.isAnalyzing) {
+        setShowTypingIndicator(false);
+      }
       if (cancelled) return;
 
       // Start typewriter: create empty message entry to update
@@ -200,14 +362,59 @@ useEffect(() => {
 
   // Enqueue the initial greeting now that queue helpers are defined
   useEffect(() => {
+    // Show greeting only on first mount
     if (!hasGreeted) {
-      pushAIMessage("Hello 👋 I’m your health assistant.");
-      pushAIMessage(
-        "I can help you with symptom analysis, appointment booking, and general health-related questions."
-      );
-      setHasGreeted(true);
+      // Small delay to ensure localStorage is loaded
+      const timer = setTimeout(() => {
+        pushAIMessage("Hello 👋 I'm your health assistant.");
+        pushAIMessage(
+          "I can help you with symptom analysis, appointment booking, and general health-related questions."
+        );
+        setHasGreeted(true);
+      }, 300);
+      return () => clearTimeout(timer);
     }
-  }, [hasGreeted]);
+  }, []); // Only run once on mount
+
+  // Handle greeting on restart
+  useEffect(() => {
+    if (!hasGreeted && messages.length === 0) {
+      // Small delay to ensure restart is fully processed
+      const timer = setTimeout(() => {
+        pushAIMessage("Hello 👋 I'm your health assistant.");
+        pushAIMessage(
+          "I can help you with symptom analysis, appointment booking, and general health-related questions."
+        );
+        setHasGreeted(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [hasGreeted, messages.length]);
+
+  // Facebook Messenger style typing animation
+  useEffect(() => {
+    if (!analyzingTyping) return;
+    let dotCount = 0;
+    const interval = setInterval(() => {
+      dotCount = (dotCount + 1) % 4;
+      setAnalyzingDots("•".repeat(dotCount) + (dotCount > 0 ? " " : ""));
+    }, 500);
+    return () => clearInterval(interval);
+  }, [analyzingTyping]);
+  // Helper function to clean specialization string (removes extra info like (cardiologist), and Dermatology)
+  const cleanSpecialization = (spec: string): string => {
+    let cleaned = spec;
+    if (cleaned.includes("(")) {
+      cleaned = cleaned.split("(")[0].trim();
+    }
+    if (cleaned.includes(" and ")) {
+      cleaned = cleaned.split(" and ")[0].trim();
+    }
+    if (cleaned.includes(",")) {
+      cleaned = cleaned.split(",")[0].trim();
+    }
+    return cleaned;
+  };
   // Handle disease selection from SeasonalHealth
   useEffect(() => {
     if (onDiseaseSelect) {
@@ -228,17 +435,7 @@ useEffect(() => {
         pushUserMessage(text);
         pushAIMessage("Okay — here is a link to consult doctors for the recommended specialization.");
         let specialization = (context as any).analysisResult?.recommended_specialization || (context as any).analysisResult?.specialization || "General Physician";
-
-        if (specialization.includes("(")) {
-          specialization = specialization.split("(")[0].trim();
-        }
-        if (specialization.includes(" and ")) {
-          specialization = specialization.split(" and ")[0].trim();
-        }
-        if (specialization.includes(",")) {
-          specialization = specialization.split(",")[0].trim();
-        }
-
+        specialization = cleanSpecialization(specialization);
         const url = `/doctor_consultation?specialization=${encodeURIComponent(specialization)}`;
         pushAIActionMessage("Open doctor listings", "Consult Doctor", url);
         setContext(prev => ({ ...(prev as any), awaitingDoctorConsent: false }));
@@ -274,64 +471,104 @@ useEffect(() => {
 
     // 5. If the brain requests a backend analysis, perform it async
     if (result.backendRequest) {
-      pushAIMessage("Analyzing your details and finding nearby doctors...");
+      // Only show analyzing message for /analyze-symptoms/ endpoint (after profile confirmed)
+      if (result.backendRequest.endpoint === "/analyze-symptoms/") {
+        pushAIMessage("Analyzing your details and finding nearby doctors...", true);
+        setAnalyzingTyping(true);
+      }
       handleBackendAnalysis(result);
     }
   };
 
   const handleBackendAnalysis = async (result: any) => {
-    let latitude: number | undefined = undefined;
-    let longitude: number | undefined = undefined;
-    if (navigator && navigator.geolocation) {
+    const endpoint = result.backendRequest.endpoint;
+
+    if (endpoint === "/create-symptom-session/") {
+      // Handle session creation
       try {
-        const pos = await new Promise<GeolocationPosition>((res, rej) =>
-          navigator.geolocation.getCurrentPosition(res, rej)
-        );
-        latitude = pos.coords.latitude;
-        longitude = pos.coords.longitude;
+        const sessionData = result.backendRequest.data;
+        // Create actual session in database
+        const sessionId = await createSymptomSession();
+        if (sessionId) {
+          sessionIdRef.current = sessionId;
+          setContext(prev => ({ ...prev, sessionId }));
+          console.log("Created symptom session:", sessionId);
+        }
       } catch (err) {
-        console.warn("Geolocation not available or denied", err);
+        console.error("Error creating symptom session:", err);
       }
+      return;
     }
 
-    try {
-      const payload = {
-        ...result.backendRequest.data,
-        latitude,
-        longitude
-      };
-
-      const analysis = await analyzeSymptoms(payload);
-
-      // Build a concise reply for the user
-      let replyText = "";
-      if (analysis.possible_diseases) {
-        replyText += `Possible conditions: ${analysis.possible_diseases.join(", ")}\n`;
-      }
-      if (analysis.severity) replyText += `Severity: ${analysis.severity}\n`;
-      if (analysis.advice) replyText += `Advice: ${analysis.advice}\n`;
-      if (analysis.recommended_specialization) replyText += `Recommended specialist: ${analysis.recommended_specialization}\n`;
-      if (analysis.recommended_doctors && analysis.recommended_doctors.length) {
-        replyText += "Nearby doctors:\n" + analysis.recommended_doctors.map((d: any) =>
-          `• ${d.full_name} — ${d.clinic_name} — Fee: ${d.consultation_fee}`
-        ).join("\n");
+    if (endpoint === "/analyze-symptoms/") {
+      let latitude: number | undefined = undefined;
+      let longitude: number | undefined = undefined;
+      if (navigator && navigator.geolocation) {
+        try {
+          const pos = await new Promise<GeolocationPosition>((res, rej) =>
+            navigator.geolocation.getCurrentPosition(res, rej)
+          );
+          latitude = pos.coords.latitude;
+          longitude = pos.coords.longitude;
+        } catch (err) {
+          console.warn("Geolocation not available or denied", err);
+        }
       }
 
-      if (!replyText) replyText = analysis.message || "Analysis complete.";
+      try {
+        const payload = {
+          ...result.backendRequest.data,
+          latitude,
+          longitude
+        };
 
-      pushAIMessage(replyText);
+        console.log("📡 SENDING PAYLOAD TO analyzeSymptoms:", payload);
 
-      // store analysis result in context for later use
-      setContext(prev => ({ ...prev, analysisResult: analysis }));
+        const analysis = await analyzeSymptoms(payload);
 
-      // If there are no nearby doctors, ask user if they'd like suggestions
-      if (!(analysis.recommended_doctors && analysis.recommended_doctors.length)) {
-        pushAIMessage("Would you like me to suggest some doctors nearby? (yes/no)");
-        setContext(prev => ({ ...prev, awaitingDoctorConsent: true, analysisResult: analysis }));
+        console.log("✅ API RESPONSE RECEIVED:", analysis);
+
+        // Build a concise reply for the user
+        let replyText = "";
+        if (analysis.possible_diseases) {
+          replyText += `Possible conditions: ${analysis.possible_diseases.join(", ")}\n`;
+        }
+        if (analysis.severity) replyText += `Severity: ${analysis.severity}\n`;
+        if (analysis.advice) replyText += `Advice: ${analysis.advice}\n`;
+        if (analysis.recommended_specialization) replyText += `Recommended specialist: ${analysis.recommended_specialization}\n`;
+        if (analysis.recommended_doctors && analysis.recommended_doctors.length) {
+          replyText += "Nearby doctors:\n" + analysis.recommended_doctors.map((d: any) =>
+            `• ${d.full_name} — ${d.clinic_name} — Fee: ${d.consultation_fee}`
+          ).join("\n");
+        }
+
+        if (!replyText) replyText = analysis.message || "Analysis complete.";
+
+        console.log("💬 REPLY TEXT:", replyText);
+
+        // Stop analyzing animation and turn off typing indicator
+        setAnalyzingTyping(false);
+        setShowTypingIndicator(false);
+
+        pushAIMessage(replyText);
+
+        // store analysis result in context for later use
+        setContext(prev => ({ ...prev, analysisResult: analysis }));
+
+        // Save session with analysis results
+        await updateSessionWithAnalysis(analysis);
+
+        // If there are no nearby doctors, ask user if they'd like suggestions
+        if (!(analysis.recommended_doctors && analysis.recommended_doctors.length)) {
+          pushAIMessage("Would you like me to suggest some doctors nearby? (yes/no)");
+          setContext(prev => ({ ...prev, awaitingDoctorConsent: true, analysisResult: analysis }));
+        }
+      } catch (err) {
+        console.error("❌ ERROR calling analyzeSymptoms:", err);
+        setAnalyzingTyping(false);
+        setShowTypingIndicator(false);
+        pushAIMessage("Sorry, I couldn't complete the analysis. Please try again later.");
       }
-    } catch (err) {
-      console.error("Error calling analyzeSymptoms:", err);
-      pushAIMessage("Sorry, I couldn't complete the analysis. Please try again later.");
     }
   };
 
@@ -340,6 +577,30 @@ useEffect(() => {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  // Restart conversation
+  const handleRestart = () => {
+    // Clear all states
+    setMessages([]);
+    setInputText("");
+    setHasGreeted(false); // Allow greeting to show again
+    setContext(createInitialContext());
+    sessionIdRef.current = null;
+    messageId.current = 1;
+    setAiQueue([]);
+    setAnalyzingTyping(false);
+    setShowTypingIndicator(false);
+
+    // Clear localStorage
+    localStorage.removeItem('chatbot_messages');
+    localStorage.removeItem('chatbot_context');
+    localStorage.removeItem('chatbot_has_greeted');
+
+    // Show greeting again after a tiny delay
+    setTimeout(() => {
+      setHasGreeted(false);
+    }, 50);
   };
 
   // Simple markdown-like formatter: escapes HTML, converts **bold** and newlines
@@ -413,6 +674,15 @@ useEffect(() => {
                   <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                   <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                 </div>
+              ) : m.isAnalyzing && showTypingIndicator ? (
+                <div className="flex items-center space-x-1 py-2">
+                  <span className="text-sm text-gray-700 font-medium">Analyzing</span>
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                </div>
               ) : (
                 <div
                   className="message-text transition-opacity duration-300 ease-in-out"
@@ -444,6 +714,13 @@ useEffect(() => {
           placeholder="Type your answer or press Enter..."
           className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        <button
+          onClick={handleRestart}
+          className="bg-gray-400 hover:bg-gray-500 text-white p-3 rounded-xl transition-colors"
+          title="Restart conversation"
+        >
+          <RotateCcw className="h-5 w-5" />
+        </button>
         <button
           onClick={handleSend}
           className="bg-blue-gradient text-white p-3 rounded-xl hover:bg-blue-700 transition-colors"
