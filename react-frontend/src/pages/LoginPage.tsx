@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import "boxicons/css/boxicons.min.css";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import DoctorRegistration from "./DoctorRegistration";
+import DoctorSelfProfile from "./DoctorSelfProfile";
+
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -103,27 +106,29 @@ const LoginPage: React.FC = () => {
     });
 
     if (res.error || !res.data.user) {
-      alert("Login failed: " + (res.error?.message || "Unknown error"));
-      setLoading(false);
+      alert("Login failed");
       return;
     }
 
     const user = res.data.user;
 
     // =========================
-    // 1️⃣ CHECK DOCTOR FIRST
+    // 1️⃣ CHECK DOCTOR
     // =========================
-    const { data: doctor, error: doctorErr } = await supabase
+    const { data: doctor } = await supabase
       .from("doctors")
-      .select("id")
+      .select("*")
       .eq("auth_id", user.id)
       .maybeSingle();
 
     if (doctor) {
-      // ✅ DOCTOR FOUND
       localStorage.setItem("role", "doctor");
-      localStorage.setItem("isLoggedIn", "true");
-      navigate("/doctor_selfprofile");
+
+      if (!doctor.profile_completed) {
+        navigate("/doctor_registration");
+      } else {
+        navigate("/doctor_selfprofile");
+      }
       return;
     }
 
@@ -136,40 +141,57 @@ const LoginPage: React.FC = () => {
       .eq("auth_id", user.id)
       .maybeSingle();
 
-    // If patient does not exist → create from pending data
     if (!patient) {
-      const saved = JSON.parse(
+      const role = localStorage.getItem("pending_role");
+
+      // =========================
+      // CREATE DOCTOR (FIRST LOGIN)
+      // =========================
+      if (role === "doctor") {
+        const savedDoctor = JSON.parse(
+          localStorage.getItem("pending_doctor_data") || "{}"
+        );
+
+        await supabase.from("doctors").insert({
+          auth_id: user.id,
+          full_name: savedDoctor.full_name,
+          email: savedDoctor.email,
+          phone: savedDoctor.phone,
+          profile_completed: false,
+        });
+
+        localStorage.removeItem("pending_doctor_data");
+        localStorage.removeItem("pending_role");
+
+        localStorage.setItem("role", "doctor");
+        navigate("/doctor_registration");
+        return;
+      }
+
+      // =========================
+      // CREATE PATIENT
+      // =========================
+      const savedPatient = JSON.parse(
         localStorage.getItem("pending_patient_data") || "{}"
       );
 
-      const { error: insertErr } = await supabase.from("patients").insert([
-        {
-          auth_id: user.id,
-          full_name: saved.full_name ?? user.email.split("@")[0],
-          email: saved.email ?? user.email,
-          phone: saved.phone ?? null,
-          address: saved.address ?? null,
-          latitude: saved.latitude ?? null,
-          longitude: saved.longitude ?? null,
-          location_allowed: saved.location_allowed ?? false,
-          terms_accepted: saved.terms_accepted ?? false,
-        },
-      ]);
-
-      if (insertErr) {
-        console.error("Patient auto-create failed:", insertErr);
-      }
+      await supabase.from("patients").insert({
+        auth_id: user.id,
+        ...savedPatient,
+      });
 
       localStorage.removeItem("pending_patient_data");
+      localStorage.removeItem("pending_role");
     }
 
-    // ✅ PATIENT LOGIN
+    // =========================
+    // PATIENT LOGIN
+    // =========================
     localStorage.setItem("role", "patient");
-    localStorage.setItem("isLoggedIn", "true");
     navigate("/index");
 
   } catch (err) {
-    console.error("login exception:", err);
+    console.error("login error:", err);
     alert("Unexpected login error.");
   } finally {
     setLoading(false);
@@ -177,72 +199,78 @@ const LoginPage: React.FC = () => {
 };
 
 
-  // ================================
-  //            REGISTER
-  // ================================
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+ // ================================
+//            REGISTER (FIXED)
+// ================================
+const handleRegister = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (!termsChecked || !locationChecked) {
-      alert("You must accept the Terms and allow location to register.");
-      return;
-    }
+  if (!termsChecked || !locationChecked) {
+    alert("You must accept the Terms and allow location to register.");
+    return;
+  }
 
-    if (!latitude || !longitude) {
-      alert("Fetching location... please wait.");
-      return;
-    }
+  if (!latitude || !longitude) {
+    alert("Fetching location... please wait.");
+    return;
+  }
 
-    if (!regName || !regPhone || !regEmail || !regPassword) {
-      alert("Please fill all the fields.");
-      return;
-    }
+  if (!regName || !regPhone || !regEmail || !regPassword) {
+    alert("Please fill all the fields.");
+    return;
+  }
 
-    // Save pending data to use AFTER email verification
+  // 🔹 Save role
+  localStorage.setItem("pending_role", selectedRoleUI);
+
+  // 🔹 Save pending data
+  if (selectedRoleUI === "patient") {
     localStorage.setItem(
       "pending_patient_data",
       JSON.stringify({
         full_name: regName,
         phone: regPhone,
+        email: regEmail.trim(),
         address,
         latitude,
         longitude,
         location_allowed: true,
         terms_accepted: true,
+      })
+    );
+  }
+
+  if (selectedRoleUI === "doctor") {
+    localStorage.setItem(
+      "pending_doctor_data",
+      JSON.stringify({
+        full_name: regName,
+        phone: regPhone,
         email: regEmail.trim(),
       })
     );
+  }
 
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signUp({
-        email: regEmail.trim(),
-        password: regPassword,
-      });
+  setLoading(true);
 
-      if (error) {
-        alert("Registration failed: " + error.message);
-        setLoading(false);
-        return;
-      }
+  try {
+    // ✅ ONLY AUTH SIGNUP HERE
+    const { error } = await supabase.auth.signUp({
+      email: regEmail.trim(),
+      password: regPassword,
+    });
 
-      alert("Registration successful! Please verify your email and then log in.");
-      setIsActive(false);
+    if (error) throw error;
 
-      // Reset fields
-      setRegName("");
-      setRegPhone("");
-      setRegEmail("");
-      setRegPassword("");
-      setTermsChecked(false);
-      setLocationChecked(false);
-    } catch (err) {
-      console.error("Register error:", err);
-      alert("Unexpected error.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    alert("Registration successful! Please verify your email and then log in.");
+    setIsActive(false);
+  } catch (err) {
+    console.error("Register error:", err);
+    alert("Unexpected error during registration.");
+  } finally {
+    setLoading(false);
+  }
+};
 
 
   // ============================

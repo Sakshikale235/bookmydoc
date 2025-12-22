@@ -186,39 +186,15 @@ const DoctorRegistration = () => {
     setUploading(true);
     try {
       // Sign up with Supabase Auth (auto-confirm for development)
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            auto_confirm: true
-          }
-        }
-      });
+      const {
+  data: { user },
+  error: userError,
+} = await supabase.auth.getUser();
 
-      if (authError) {
-        console.error('Auth sign up error:', authError);
-        alert('Could not create user account. Please try again.');
-        return;
-      }
-
-      // Sign in to establish session for RLS
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
-
-      if (signInError) {
-        console.error('Auth sign in error:', signInError);
-        alert('Could not sign in after registration. Please try again.');
-        return;
-      }
-
-      const user = signInData.user;
-      if (!user) {
-        alert('User not found after sign in.');
-        return;
-      }
+if (userError || !user) {
+  alert("You must be logged in to complete registration");
+  return;
+}
 
       let profilePhotoUrl: string | null = null;
       let medicalLicenseUrl: string | null = null;
@@ -280,62 +256,41 @@ const DoctorRegistration = () => {
           medicalCertificatesUrl = publicUrlData.publicUrl || null;
         }
       }
+      const doctorUpdateData = {
+  full_name: formData.fullName,
+  phone: formData.mobile || null,
+  specialization: formData.specialization,
+  qualification: formData.degrees.join(", "),
+  experience: formData.experience
+    ? Number(formData.experience)
+    : null,
+  clinic_name: formData.clinics[0]?.name || null,
+  location: formData.clinics[0]?.address || null,
+  bio: formData.bio || null,
+  assistant_contact: formData.assistantContact || null,
+  common_conditions: formData.conditions.length
+    ? formData.conditions
+    : null,
+  advance_notice: formData.advanceNotice || null,
+  home_visits: formData.homeVisits,
+  auto_confirm_appointments: formData.autoConfirm,
+  monthly_feedback_summaries: formData.feedbackSummary,
+  medical_license: medicalLicenseUrl,
+  medical_certificates: medicalCertificatesUrl,
+  profile_completed: true,
+  ...(profilePhotoUrl && { profile_photo: profilePhotoUrl }),
+};
 
-      // Build doctor insert payload
-      interface DoctorInsertData {
-        auth_id: string;
-        full_name: string;
-        email: string | null;
-        phone: string | null;
-        specialization: string;
-        qualification: string;
-        experience: number | null;
-        clinic_name: string | null;
-        consultation_fee: null;
-        location: string | null;
-        bio: string | null;
-        assistant_contact: string | null;
-        common_conditions: string[] | null;
-        advance_notice: string | null;
-        home_visits: boolean;
-        auto_confirm_appointments: boolean;
-        monthly_feedback_summaries: boolean;
-        medical_license: string | null;
-        medical_certificates: string | null;
-        profile_photo?: string;
-      }
+const { error: updateError } = await supabase
+  .from("doctors")
+  .update(doctorUpdateData)
+  .eq("auth_id", user.id);
 
-      const doctorData: DoctorInsertData = {
-        auth_id: user.id,
-        full_name: formData.fullName,
-        email: formData.email || null,
-        phone: formData.mobile || null,
-        specialization: formData.specialization,
-        qualification: formData.degrees.join(', '),
-        experience: formData.experience ? Number(formData.experience) : null,
-        clinic_name: formData.clinics[0]?.name || null,
-        consultation_fee: null,
-        location: formData.clinics[0]?.address || null,
-        bio: formData.bio || null,
-        assistant_contact: formData.assistantContact || null,
-        common_conditions: formData.conditions && formData.conditions.length ? formData.conditions : null,
-        advance_notice: formData.advanceNotice || null,
-        home_visits: formData.homeVisits,
-        auto_confirm_appointments: formData.autoConfirm,
-        monthly_feedback_summaries: formData.feedbackSummary,
-        medical_license: medicalLicenseUrl,
-        medical_certificates: medicalCertificatesUrl
-      };
-      if (profilePhotoUrl) doctorData.profile_photo = profilePhotoUrl;
-
-      console.log('Doctor insert payload:', doctorData);
-      const { error: insertError } = await supabase.from('doctors').insert([doctorData]);
-
-      if (insertError) {
-        console.error('Insert doctor error:', insertError);
-        alert('Could not save doctor profile. Please try again.');
-        return;
-      }
+if (updateError) {
+  console.error("Doctor update error:", updateError);
+  alert("Could not complete doctor registration");
+  return;
+}
 
       alert('Doctor registration successful');
       navigate('/doctor_selfprofile');
@@ -380,13 +335,6 @@ const DoctorRegistration = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <Link
-            to="/user_profile"
-            className="inline-flex bg-white px-4 shadow-md py-2 items-center rounded-2xl text-blue-600 hover:shadow-lg hover:text-blue-800 mb-4 group transition-shadow duration-300"
-          >
-            <ArrowLeft className="w-5 h-5 mr-2  group-hover:-translate-x-1 transition-transform" />
-            Back to Profile
-          </Link>
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-green-500 rounded-full mb-4">
               <Stethoscope className="w-8 h-8 text-white" />

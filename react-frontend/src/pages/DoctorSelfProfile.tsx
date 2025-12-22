@@ -75,6 +75,7 @@ const DoctorSelfProfile: React.FC = () => {
       .from('appointments')
       .select(`
         id,
+        patient_id,
         appointment_date,
         status,
         reason,
