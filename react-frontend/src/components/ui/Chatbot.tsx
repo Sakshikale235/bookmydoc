@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useNavigate } from "react-router-dom";
 import { Bot, Send, RotateCcw } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { analyzeSymptoms } from "../../lib/api";
@@ -28,7 +29,8 @@ interface ChatbotProps {
 /* ----------------------------------
    Chatbot Component
 ----------------------------------- */
-const ChatbotContent = ({ onDiseaseSelect }: ChatbotProps, ref: React.Ref<any>) => {
+const ChatbotContent: React.ForwardRefRenderFunction<{ sendDiseaseMessage: (disease: string) => void }, ChatbotProps> = ({ onDiseaseSelect }, ref) => {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
 
@@ -39,58 +41,119 @@ const [hasGreeted, setHasGreeted] = useState(false);
 
   // Load chat history from localStorage on mount
   useEffect(() => {
-    try {
-      const savedMessages = localStorage.getItem('chatbot_messages');
-      const savedContext = localStorage.getItem('chatbot_context');
-      const savedHasGreeted = localStorage.getItem('chatbot_has_greeted');
+    async function initializeChat() {
+      try {
+        // Get current user first
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth?.user?.id;
 
-      if (savedMessages) {
-        const parsedMessages = JSON.parse(savedMessages);
-        setMessages(parsedMessages);
+        if (userId) {
+          const savedMessages = localStorage.getItem(`chatbot_messages_${userId}`);
+          const savedContext = localStorage.getItem(`chatbot_context_${userId}`);
+          const savedHasGreeted = localStorage.getItem(`chatbot_has_greeted_${userId}`);
 
-        // Update messageId ref to continue from the highest ID
-        if (parsedMessages.length > 0) {
-          const maxId = Math.max(...parsedMessages.map((m: Message) => parseInt(m.id)));
-          messageId.current = maxId + 1;
+          if (savedMessages) {
+            const parsedMessages = JSON.parse(savedMessages);
+            if (Array.isArray(parsedMessages)) {
+              setMessages(parsedMessages);
+
+              // Update messageId ref to continue from the highest ID
+              if (parsedMessages.length > 0) {
+                const maxId = Math.max(...parsedMessages.map((m: Message) => parseInt(m.id)));
+                messageId.current = maxId + 1;
+              }
+            }
+          }
+
+          if (savedContext) {
+            const parsedContext = JSON.parse(savedContext);
+            if (parsedContext && typeof parsedContext === 'object') {
+              setContext(parsedContext);
+            }
+          }
+
+          if (savedHasGreeted) {
+            setHasGreeted(JSON.parse(savedHasGreeted));
+          }
         }
-      }
 
-      if (savedContext) {
-        const parsedContext = JSON.parse(savedContext);
-        setContext(parsedContext);
-      }
+        // Fetch patient profile details on refresh
+        if (auth?.user) {
+          const { data, error } = await supabase
+            .from("patients")
+            .select("age, gender, height, weight, address")
+            .eq("auth_id", auth.user.id)
+            .single();
 
-      if (savedHasGreeted) {
-        setHasGreeted(JSON.parse(savedHasGreeted));
+          if (data) {
+            setContext(prev => ({
+              ...prev,
+              patientProfile: data,
+              collected: {
+                ...prev.collected,
+                age: data.age ?? prev.collected.age,
+                gender: data.gender ?? prev.collected.gender,
+                height: data.height ?? prev.collected.height,
+                weight: data.weight ?? prev.collected.weight,
+                location: data.address ?? prev.collected.location
+              }
+            }));
+          } else {
+            console.warn("No patient data found", error);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to initialize chat:', error);
       }
-    } catch (error) {
-      console.warn('Failed to load chat history from localStorage:', error);
     }
+
+    initializeChat();
   }, []);
 
   // Save chat history to localStorage whenever messages, context, or hasGreeted change
   useEffect(() => {
-    try {
-      localStorage.setItem('chatbot_messages', JSON.stringify(messages));
-    } catch (error) {
-      console.warn('Failed to save messages to localStorage:', error);
+    async function saveMessages() {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth?.user?.id;
+        if (userId) {
+          localStorage.setItem(`chatbot_messages_${userId}`, JSON.stringify(messages));
+        }
+      } catch (error) {
+        console.warn('Failed to save messages to localStorage:', error);
+      }
     }
+    saveMessages();
   }, [messages]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('chatbot_context', JSON.stringify(context));
-    } catch (error) {
-      console.warn('Failed to save context to localStorage:', error);
+    async function saveContext() {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth?.user?.id;
+        if (userId) {
+          localStorage.setItem(`chatbot_context_${userId}`, JSON.stringify(context));
+        }
+      } catch (error) {
+        console.warn('Failed to save context to localStorage:', error);
+      }
     }
+    saveContext();
   }, [context]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('chatbot_has_greeted', JSON.stringify(hasGreeted));
-    } catch (error) {
-      console.warn('Failed to save hasGreeted to localStorage:', error);
+    async function saveHasGreeted() {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth?.user?.id;
+        if (userId) {
+          localStorage.setItem(`chatbot_has_greeted_${userId}`, JSON.stringify(hasGreeted));
+        }
+      } catch (error) {
+        console.warn('Failed to save hasGreeted to localStorage:', error);
+      }
     }
+    saveHasGreeted();
   }, [hasGreeted]);
 
   const messageId = useRef(1);
@@ -193,7 +256,6 @@ const [hasGreeted, setHasGreeted] = useState(false);
         setContext(result.context);
 
         if (result.backendRequest) {
-          pushAIMessage("Analyzing your details and finding nearby doctors...");
           handleBackendAnalysis(result);
         }
       }, 0);
@@ -235,7 +297,15 @@ useEffect(() => {
       if (data) {
         setContext(prev => ({
           ...prev,
-          patientProfile: data
+          patientProfile: data,
+          collected: {
+            ...prev.collected,
+            age: data.age ?? prev.collected.age,
+            gender: data.gender ?? prev.collected.gender,
+            height: data.height ?? prev.collected.height,
+            weight: data.weight ?? prev.collected.weight,
+            location: data.address ?? prev.collected.location
+          }
         }));
         console.log("Patient profile set in context:", data);
       } else {
@@ -249,6 +319,43 @@ useEffect(() => {
   fetchPatient();
 }, []);
 
+
+  // Fetch patient profile details when the user lands on the symptom checker page
+useEffect(() => {
+  async function fetchPatientProfile() {
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (auth?.user) {
+        const { data, error } = await supabase
+          .from("patients")
+          .select("age, gender, height, weight, address")
+          .eq("auth_id", auth.user.id)
+          .single();
+
+        if (data) {
+          setContext(prev => ({
+            ...prev,
+            patientProfile: data,
+            collected: {
+              ...prev.collected,
+              age: data.age ?? prev.collected.age,
+              gender: data.gender ?? prev.collected.gender,
+              height: data.height ?? prev.collected.height,
+              weight: data.weight ?? prev.collected.weight,
+              location: data.address ?? prev.collected.location
+            }
+          }));
+        } else {
+          console.warn("No patient data found", error);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching patient profile:", error);
+    }
+  }
+
+  fetchPatientProfile();
+}, []);
 
   /* ----------------------------------
      Helpers
@@ -360,36 +467,7 @@ useEffect(() => {
     };
   }, [aiQueue.length]);
 
-  // Enqueue the initial greeting now that queue helpers are defined
-  useEffect(() => {
-    // Show greeting only on first mount
-    if (!hasGreeted) {
-      // Small delay to ensure localStorage is loaded
-      const timer = setTimeout(() => {
-        pushAIMessage("Hello 👋 I'm your health assistant.");
-        pushAIMessage(
-          "I can help you with symptom analysis, appointment booking, and general health-related questions."
-        );
-        setHasGreeted(true);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, []); // Only run once on mount
 
-  // Handle greeting on restart
-  useEffect(() => {
-    if (!hasGreeted && messages.length === 0) {
-      // Small delay to ensure restart is fully processed
-      const timer = setTimeout(() => {
-        pushAIMessage("Hello 👋 I'm your health assistant.");
-        pushAIMessage(
-          "I can help you with symptom analysis, appointment booking, and general health-related questions."
-        );
-        setHasGreeted(true);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [hasGreeted, messages.length]);
 
   // Facebook Messenger style typing animation
   useEffect(() => {
@@ -415,6 +493,15 @@ useEffect(() => {
     }
     return cleaned;
   };
+
+  const handleDoctorSearchIntent = () => {
+    const lastAnalysisResult = (context as any).analysisResult;
+    const specialization =
+      lastAnalysisResult?.recommended_specialization ||
+      lastAnalysisResult?.specialization ||
+      "General Physician";
+    navigate(`/doctor_consultation?specialization=${encodeURIComponent(specialization)}`);
+  };
   // Handle disease selection from SeasonalHealth
   useEffect(() => {
     if (onDiseaseSelect) {
@@ -428,23 +515,43 @@ useEffect(() => {
     const text = inputText.trim();
     if (!text) return;
 
+    // Interrupt any ongoing typing animation
+    if (isTyping) {
+      if (typingIntervalRef.current) {
+        window.clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
+      }
+      setIsTyping(false);
+      setShowTypingIndicator(false);
+      setAnalyzingTyping(false);
+      // Clear any remaining AI queue
+      setAiQueue([]);
+      // Remove any temporary typing messages and partial AI messages
+      setMessages(prev => {
+        let filtered = prev.filter(m => !m.isTyping);
+        // If the last message is from AI and has no action (incomplete), remove it
+        if (filtered.length > 0 && filtered[filtered.length - 1].sender === 'ai' && !filtered[filtered.length - 1].action) {
+          filtered = filtered.slice(0, -1);
+        }
+        return filtered;
+      });
+    }
+
     // If we're waiting for user consent to show nearby doctors, handle that first
-    if ((context as any).awaitingDoctorConsent) {
+    if ((context as any).awaitingNearbyDoctorConsent) {
       const vLower = text.toLowerCase().trim();
       if (vLower === "yes" || vLower === "y") {
         pushUserMessage(text);
-        pushAIMessage("Okay — here is a link to consult doctors for the recommended specialization.");
-        let specialization = (context as any).analysisResult?.recommended_specialization || (context as any).analysisResult?.specialization || "General Physician";
-        specialization = cleanSpecialization(specialization);
-        const url = `/doctor_consultation?specialization=${encodeURIComponent(specialization)}`;
-        pushAIActionMessage("Open doctor listings", "Consult Doctor", url);
-        setContext(prev => ({ ...(prev as any), awaitingDoctorConsent: false }));
+        pushAIMessage("Great! Here is a link to find nearby doctors.");
+        const url = `/nearby_doctors`;
+        pushAIActionMessage("Open nearby doctors", "Nearby Doctors", url);
+        setContext(prev => ({ ...(prev as any), awaitingNearbyDoctorConsent: false }));
         setInputText("");
         return;
       } else if (vLower === "no" || vLower === "n") {
         pushUserMessage(text);
-        pushAIMessage("Okay — if you need anything else, feel free to ask anytime.");
-        setContext(prev => ({ ...(prev as any), awaitingDoctorConsent: false }));
+        pushAIMessage("Alright! Let me know if you need anything else.");
+        setContext(prev => ({ ...(prev as any), awaitingNearbyDoctorConsent: false }));
         setInputText("");
         return;
       } else {
@@ -472,7 +579,7 @@ useEffect(() => {
     // 5. If the brain requests a backend analysis, perform it async
     if (result.backendRequest) {
       // Only show analyzing message for /analyze-symptoms/ endpoint (after profile confirmed)
-      if (result.backendRequest.endpoint === "/analyze-symptoms/") {
+      if (result.backendRequest.endpoint === "/analyze-symptoms/" && !(context as any).awaitingNearbyDoctorConsent) {
         pushAIMessage("Analyzing your details and finding nearby doctors...", true);
         setAnalyzingTyping(true);
       }
@@ -536,11 +643,11 @@ useEffect(() => {
         if (analysis.severity) replyText += `Severity: ${analysis.severity}\n`;
         if (analysis.advice) replyText += `Advice: ${analysis.advice}\n`;
         if (analysis.recommended_specialization) replyText += `Recommended specialist: ${analysis.recommended_specialization}\n`;
-        if (analysis.recommended_doctors && analysis.recommended_doctors.length) {
-          replyText += "Nearby doctors:\n" + analysis.recommended_doctors.map((d: any) =>
-            `• ${d.full_name} — ${d.clinic_name} — Fee: ${d.consultation_fee}`
-          ).join("\n");
-        }
+        // if (analysis.recommended_doctors && analysis.recommended_doctors.length) {
+        //   replyText += "Nearby doctors:\n" + analysis.recommended_doctors.map((d: any) =>
+        //     `• ${d.full_name} — ${d.clinic_name} — Fee: ${d.consultation_fee}`
+        //   ).join("\n");
+        // }
 
         if (!replyText) replyText = analysis.message || "Analysis complete.";
 
@@ -558,11 +665,9 @@ useEffect(() => {
         // Save session with analysis results
         await updateSessionWithAnalysis(analysis);
 
-        // If there are no nearby doctors, ask user if they'd like suggestions
-        if (!(analysis.recommended_doctors && analysis.recommended_doctors.length)) {
-          pushAIMessage("Would you like me to suggest some doctors nearby? (yes/no)");
-          setContext(prev => ({ ...prev, awaitingDoctorConsent: true, analysisResult: analysis }));
-        }
+        // Always ask user if they'd like suggestions for nearby doctors after analysis
+        pushAIMessage("Would you like me to suggest some doctors nearby? (yes/no)");
+        setContext(prev => ({ ...prev, awaitingNearbyDoctorConsent: true }));
       } catch (err) {
         console.error("❌ ERROR calling analyzeSymptoms:", err);
         setAnalyzingTyping(false);
@@ -579,31 +684,79 @@ useEffect(() => {
     }
   };
 
-  // Restart conversation
+
+  // Helper function to fetch patient profile
+  const fetchPatientProfile = async () => {
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth?.user) return;
+
+      const { data, error } = await supabase
+        .from("patients")
+        .select("age, gender, height, weight, address")
+        .eq("auth_id", auth.user.id)
+        .single();
+
+      if (data) {
+        setContext(prev => ({
+          ...prev,
+          patientProfile: data,
+          collected: {
+            ...prev.collected,
+            age: data.age ?? prev.collected.age,
+            gender: data.gender ?? prev.collected.gender,
+            height: data.height ?? prev.collected.height,
+            weight: data.weight ?? prev.collected.weight,
+            location: data.address ?? prev.collected.location
+          }
+        }));
+      } else {
+        console.warn("No patient data found", error);
+      }
+    } catch (error) {
+      console.error("Error fetching patient profile:", error);
+    }
+  };
+
   const handleRestart = () => {
     // Clear all states
-    setMessages([]);
     setInputText("");
-    setHasGreeted(false); // Allow greeting to show again
+    setMessages([]); // Clear messages immediately
+    setHasGreeted(false);
     setContext(createInitialContext());
     sessionIdRef.current = null;
-    messageId.current = 1;
+    messageId.current = Date.now(); // Use timestamp for unique IDs
     setAiQueue([]);
     setAnalyzingTyping(false);
     setShowTypingIndicator(false);
 
-    // Clear localStorage
-    localStorage.removeItem('chatbot_messages');
-    localStorage.removeItem('chatbot_context');
-    localStorage.removeItem('chatbot_has_greeted');
+    // Clear user-specific localStorage
+    (async () => {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth?.user?.id;
+        if (userId) {
+          localStorage.removeItem(`chatbot_messages_${userId}`);
+          localStorage.removeItem(`chatbot_context_${userId}`);
+          localStorage.removeItem(`chatbot_has_greeted_${userId}`);
+        }
+      } catch (error) {
+        console.warn('Failed to clear user-specific localStorage:', error);
+      }
+    })();
 
-    // Show greeting again after a tiny delay
+    // Refetch patient profile after restart (non-blocking)
+    fetchPatientProfile();
+
+    // Show greeting directly after restart
     setTimeout(() => {
-      setHasGreeted(false);
-    }, 50);
+      pushAIMessage("Hello 👋 I'm your health assistant.");
+      pushAIMessage(
+        "I can help you with symptom analysis, appointment booking, and general health-related questions."
+      );
+      setHasGreeted(true);
+    }, 100);
   };
-
-  // Simple markdown-like formatter: escapes HTML, converts **bold** and newlines
   const formatMessageToHtml = (text: string) => {
     if (!text) return "";
     const escapeHtml = (s: string) =>

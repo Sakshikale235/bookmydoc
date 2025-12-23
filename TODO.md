@@ -1,29 +1,18 @@
-# Medical Dictionary Enhancement - Priority Task
+# Fix Profile Fetching on Restart Conversation
 
-## Objective
-Expand medicalMap.ts with comprehensive symptom mappings to improve NLP capabilities for symptom detection and normalization.
+## Issue
+When the restart conversation button is clicked, the chatbot shows "profile details and not provided" because the patient profile is not refetched after the context is reset.
 
-## Current Status
-- medicalMap.ts has only basic mappings (12 entries)
-- medical_dictionary.json contains extensive raw variations (~5000+ entries) but needs organization
-- NLP_Improvement_Suggestions.txt identifies this as highest priority
+## Root Cause
+- `handleRestart` resets context to `createInitialContext()`, clearing `patientProfile`
+- Profile fetching useEffects only run on component mount (empty dependency arrays)
+- No refetching logic in `handleRestart`
 
-## Tasks
-- [x] Analyze medical_dictionary.json patterns and extract key symptom categories
-- [ ] Create organized mappings for common symptoms (fever, cough, headache, etc.)
-- [ ] Add Hinglish/Regional language mappings (bukhar, khasi, sirdard, etc.)
-- [ ] Include common misspellings and alternative phrasings
-- [ ] Organize mappings by symptom category with comments
-- [ ] Test mappings with sample inputs
-- [ ] Update medicalMap.ts with comprehensive mappings
+## Plan
+1. Modify `handleRestart` to refetch patient profile after resetting context
+2. Ensure profile is available for symptom analysis after restart
+3. Test that profile details are properly loaded on both landing and restart
 
-## Key Findings
-- medical_dictionary.json is a flat list of ~5000 words, not mappings
-- generate_med_dict.ts shows base symptoms, conditions, Hinglish terms
-- Need to manually create "variation -> normalized" mappings
-- Focus on symptoms first, then conditions, then Hinglish terms
-
-## Expected Outcome
-- Significantly improved symptom recognition accuracy
-- Better handling of typos, Hinglish terms, and variations
-- Enhanced user experience in chatbot interactions
+## Implementation Steps
+- [ ] Update `handleRestart` function to include profile refetching logic
+- [ ] Test the fix by restarting conversation and reporting symptoms

@@ -32,6 +32,7 @@ export function processChatMessage(
     reply: string;
     context: ConversationContext;
     backendRequest?: { endpoint: string; data: any };
+    navigate?: string;
 } {
     // -----------------------------
     // 1. NORMALIZATION
@@ -59,6 +60,23 @@ export function processChatMessage(
     // =====================================================
 
     // -----------------------------
+    // DISEASE INTENT (HIGHEST PRIORITY)
+    // -----------------------------
+    if (intent.type === "report_disease") {
+        const disease = intent.targets?.[0] || normalized.normalizedText;
+        console.log("🩺 DISEASE DETECTED:", disease);
+
+        return {
+            reply: `I understand you have ${disease}. Let me recommend a specialist for you.`,
+            context: prevContext,
+            backendRequest: {
+                endpoint: "/recommend-doctor/",
+                data: { disease: disease }
+            }
+        };
+    }
+
+    // -----------------------------
     // SYMPTOM INTENT (HIGHEST PRIORITY)
     // -----------------------------
     if (intent.type === "report_symptom") {
@@ -73,7 +91,6 @@ export function processChatMessage(
                 weight: p?.weight,
                 location: p?.address,
                 symptoms: [
-                    ...(prevContext.collected.symptoms ?? []),
                     normalized.normalizedText
                 ]
             },
@@ -132,6 +149,23 @@ export function processChatMessage(
         return {
             reply: "You're welcome! Feel free to ask if you need anything else.",
             context: prevContext
+        };
+    }
+
+    // -----------------------------
+    // CONSULT DOCTOR INTENT
+    // -----------------------------
+    if (intent.type === "consult_doctor") {
+        console.log("👨‍⚕️ CONSULT DOCTOR INTENT DETECTED");
+
+        // Get the last analysis result from context
+        const lastAnalysis = prevContext.lastAnalysisResult;
+        const specialization = lastAnalysis?.recommendedSpecialization || "General Physician";
+
+        return {
+            reply: `Based on your symptoms, I recommend consulting a ${specialization}. Let me help you find one.`,
+            context: prevContext,
+            navigate: `/doctor-consultation?specialization=${encodeURIComponent(specialization)}`
         };
     }
 

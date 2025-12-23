@@ -25,6 +25,11 @@ export interface ConversationContext {
     address?: string;
   };
 
+  lastAnalysisResult?: {
+    recommendedSpecialization?: string;
+    [key: string]: any;
+  };
+
   fieldToUpdate?: string;
   sessionId?: string;
 }
