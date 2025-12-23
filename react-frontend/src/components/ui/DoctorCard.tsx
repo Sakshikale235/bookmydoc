@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Star, MapPin, Clock, Video, Calendar } from 'lucide-react';
+import { Link } from "react-router-dom";
+
 
 interface Doctor {
   id: number;
@@ -59,6 +61,7 @@ export const DoctorCard: React.FC<doctorcardprops> = ({ doctor, index, onBook })
       }}
       whileHover={{ scale: 1.05, y: -10, boxShadow: "0 10px 25px rgba(0,0,0,0.15)" }}
     >
+
       {/* Doctor Image & Basic Info */}
       <div className="p-6 pb-4">
         <div className="flex items-start space-x-4">
@@ -119,16 +122,25 @@ export const DoctorCard: React.FC<doctorcardprops> = ({ doctor, index, onBook })
 
       {/* Action Buttons */}
       <div className="px-12 pb-12 flex space-x-3">
-        <motion.button
-          className="flex-1 bg-[#2D9CDB] bg-blue-gradient text-white py-3 rounded-xl font-medium hover:bg-[#56CCF2]  transition-colors duration-200 flex items-center hover:shadow-glow-blue hover:translate-y-[-5px] active:translate-y-0 justify-center space-x-2"
-          onClick={onBook}
+        <motion.div
+          className="flex-1"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
+          onClick={onBook}
         >
-          <Calendar className="h-4 w-4" />
-          <span>Book</span>
-        </motion.button>
+          <Link
+            to={`/book_appointment/${doctor.id}`}
+            className="w-full bg-[#2D9CDB] bg-blue-gradient text-white py-3 rounded-xl 
+                       font-medium hover:bg-[#56CCF2] transition-colors duration-200 
+                       flex items-center justify-center space-x-2 hover:shadow-glow-blue 
+                       hover:translate-y-[-5px] active:translate-y-0"
+          >
+            <Calendar className="h-4 w-4" />
+            <span>Book</span>
+          </Link>
+        </motion.div>
       </div>
+
     </motion.div>
   );
 };

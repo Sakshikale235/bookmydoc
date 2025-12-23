@@ -15,6 +15,7 @@ import DoctorSelfProfile from "./pages/DoctorSelfProfile";
 import BookAppointment from "./pages/BookAppointment";
 import ProtectedRoute from "./pages/ProtectedRoute"; // ✅ new
 import ResetPassword from "./pages/ResetPassword";
+import About from "./pages/About";
 
 const queryClient = new QueryClient();
 
@@ -22,7 +23,8 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <Sonner />
+      <Sonner position="top-center" />
+
       <BrowserRouter>
         <Routes>
           {/* Redirect root to login */}
@@ -56,6 +58,15 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+          <Route
+  path="/about"
+  element={
+    <ProtectedRoute>
+      <About />
+    </ProtectedRoute>
+  }
+/>
+
           <Route 
             path="/reset-password" 
             element={
