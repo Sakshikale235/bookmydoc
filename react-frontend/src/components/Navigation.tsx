@@ -1,16 +1,20 @@
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/bookmydoclogo.png";
 import { Search, Stethoscope, User, LogIn, UserCircle, Menu, X } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import gsap from "gsap";
 import { supabase } from "@/lib/supabaseClient";
 
-const Navigation = () => {
+const Navigation: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeItem, setActiveItem] = useState("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [count, setCount] = useState<number>(0);
+  const [shake, setShake] = useState(false);
+  const intervalRef = useRef<number | null>(null);
+  const timeoutRef = useRef<number | null>(null);
 
   const navRef = useRef<HTMLDivElement>(null);
   const navLinksRef = useRef<HTMLDivElement>(null);
@@ -79,11 +83,60 @@ const Navigation = () => {
     }
   };
 
+  useEffect(() => {
+    const onCount = (e: any) => setCount(Number(e.detail?.count ?? 0));
+    const onShake = (_: any) => {
+      // start repeating pattern: shake 3s, wait 4s, repeat
+      // if pattern already running, restart
+      stopPattern();
+      // initial start immediately
+      setShake(true);
+      timeoutRef.current = window.setTimeout(() => setShake(false), 3000);
+      // repeat every 7s (3s shake + 4s pause)
+      intervalRef.current = window.setInterval(() => {
+        setShake(true);
+        // stop shake after 3s
+        window.setTimeout(() => setShake(false), 3000);
+      }, 7000) as unknown as number;
+    };
+
+    const onToggleStop = () => {
+      // stop shaking when panel toggled/opened
+      stopPattern();
+    };
+
+    const stopPattern = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      setShake(false);
+    };
+
+    window.addEventListener("bm_notify_count", onCount as EventListener);
+    window.addEventListener("bm_notify_shake", onShake as EventListener);
+    window.addEventListener("bm_notify_toggle", onToggleStop as EventListener);
+
+    return () => {
+      window.removeEventListener("bm_notify_count", onCount as EventListener);
+      window.removeEventListener("bm_notify_shake", onShake as EventListener);
+      window.removeEventListener("bm_notify_toggle", onToggleStop as EventListener);
+      stopPattern();
+    };
+  }, []);
+
+  const togglePanel = () => {
+    window.dispatchEvent(new CustomEvent("bm_notify_toggle"));
+  };
+
   return (
     <nav className="bg-background/95 backdrop-blur-md border-b border-border sticky top-0 z-50 shadow-card">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16" ref={navRef}>
-          {/* Logo */}
           {/* Logo */}
           <div className="flex items-center space-x-2 cursor-pointer">
             <img src={logo} alt="BookMyDoc Logo" className="h-12 w-auto object-contain" />
@@ -95,11 +148,11 @@ const Navigation = () => {
               item.id === "home" ? (
                 <button
                   key={item.id}
-                  className={`relative text-md font-medium transition-colors hover:text-primary
+                  className={`relative text-md font-medium text-gray-700 transition-colors hover:text-primary
                     after:content-[''] after:absolute after:left-0 after:bottom-[-2px] 
                     after:h-[2px] after:w-0 after:bg-[#2D9CDB] after:transition-all 
                     after:duration-300 hover:after:w-full
-                    ${activeItem === item.id && !isSymptomCheckerPage ? "text-[#2D9CDB] after:w-full" : "text-muted-foreground"}
+                    ${activeItem === item.id && !isSymptomCheckerPage ? "text-[#2D9CDB] after:w-full" : ""}
                   `}
                   onClick={() => {
                     navigate("/index");
@@ -112,11 +165,11 @@ const Navigation = () => {
                 <Link
                   key={item.id}
                   to={item.href}
-                  className={`relative text-md font-medium transition-colors hover:text-primary
+                  className={`relative text-md font-medium text-gray-700 transition-colors hover:text-primary
                     after:content-[''] after:absolute after:left-0 after:bottom-[-2px] 
                     after:h-[2px] after:w-0 after:bg-[#2D9CDB] after:transition-all 
                     after:duration-300 hover:after:w-full
-                    ${activeItem === item.id && !isSymptomCheckerPage ? "text-[#2D9CDB] after:w-full" : "text-muted-foreground"}
+                    ${activeItem === item.id && !isSymptomCheckerPage ? "text-[#2D9CDB] after:w-full" : ""}
                   `}
                   onClick={() => !isSymptomCheckerPage && setActiveItem(item.id)}
                 >
@@ -124,6 +177,23 @@ const Navigation = () => {
                 </Link>
               )
             )}
+
+            {/* Bell placed next to nav links (keeps other items intact) */}
+            <button
+              onClick={togglePanel}
+              aria-label="Notifications"
+              className="relative p-2 rounded-full ml-2"
+              style={{
+                animation: shake ? "bell-shake 0.35s ease-in-out 0s 8" : undefined,
+              }}
+            >
+              <span style={{ fontSize: 20, display: "inline-block", lineHeight: 1 }}>🔔</span>
+              {count > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+                  {count}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* Action Buttons */}
@@ -289,6 +359,8 @@ const Navigation = () => {
             </div>
           </div>
         )}
+
+        {/* removed duplicate desktop bell — bell lives inside the nav links now */}
       </div>
     </nav>
   );

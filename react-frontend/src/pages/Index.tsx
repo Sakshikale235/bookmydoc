@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabaseClient";
 const Index = () => {
   const [authId, setAuthId] = useState<string | null>(null);
   const [patientId, setPatientId] = useState<string | null>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -30,10 +31,25 @@ const Index = () => {
     })();
   }, []);
 
+  useEffect(() => {
+    const onToggle = () => setNotifOpen((s) => !s);
+    // if panel opened we should stop bell shake; emit small event so bell can stop if needed
+    const onOpen = () => {
+      // nothing else required here, panel open state will stop shaking automatically (nav listens to shake events only)
+    };
+
+    window.addEventListener("bm_notify_toggle", onToggle);
+    window.addEventListener("bm_notify_new", onOpen);
+
+    return () => {
+      window.removeEventListener("bm_notify_toggle", onToggle);
+      window.removeEventListener("bm_notify_new", onOpen);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#F0FAFD]">
-      {/* add NotificationCenter at top level */}
-      <NotificationCenter authId={authId} patientId={patientId} />
+      <NotificationCenter authId={authId} patientId={patientId} open={notifOpen} onRequestClose={() => setNotifOpen(false)} />
 
       <Navigation />
       <HeroSection />
