@@ -158,17 +158,17 @@ Symptoms: {symptoms}
 - If symptoms are unclear, choose statistically likely likely conditions in India.
 
 [ALLOWED SPECIALISTS — CHOOSE ONE ONLY]
-["general physician","cardiologist","neurologist","pulmonologist","ent specialist",
- "gastroenterologist","dermatologist","orthopedic","endocrinologist",
- "psychiatrist","gynecologist","urologist"]
+["General Physician","Cardiologist","Neurologist","Pulmonologist","Ent Specialist",
+ "Gastroenterologist","Dermatologist","Orthopedic","Endocrinologist",
+ "Psychiatrist","Gynecologist","Urologist"]
 
 [OUTPUT — JSON ONLY]
-{
+{{
   "possible_diseases": ["Disease1","Disease2"],
   "severity": "mild | moderate | severe | emergency",
   "doctor_recommendation": "one allowed specialist",
   "advice": "Short, friendly, clinical next step"
-}
+}}
 """
 
 

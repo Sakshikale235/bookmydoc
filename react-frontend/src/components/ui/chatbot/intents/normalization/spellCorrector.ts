@@ -5,7 +5,7 @@ const STOP_WORDS = new Set([
   "problem", "issue",
   "male", "female", "man", "woman",
   "me", "my", "i", "you",
-  "skin", "heart", "bone", "eye",
+  "skin", "heart", "bone", "eye", "chest", "loss", "hallucination", "memory",
   "have", "has", "had", "having"
 ]);
 

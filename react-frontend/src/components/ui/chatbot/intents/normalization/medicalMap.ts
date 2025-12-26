@@ -65,6 +65,7 @@ export const medicalMap: Record<string, string> = {
   "pet dard": "stomach pain",
   "pet mein dard": "stomach pain",
   "stomach ache": "stomach pain",
+  "stomachache": "stomach pain",
   "stomach pain": "stomach pain",
   "abdominal pain": "stomach pain",
   "abdomen pain": "stomach pain",
@@ -107,6 +108,7 @@ export const medicalMap: Record<string, string> = {
   "running nose": "cold",
   "runny nose": "cold",
   "stuffy nose": "cold",
+  "stiff nose": "cold",
   "nasal congestion": "cold",
   "sneezing": "cold",
   "sneeze": "cold",
@@ -196,7 +198,7 @@ export const medicalMap: Record<string, string> = {
   // === SHORTNESS OF BREATH SYMPTOMS ===
   "shortness of breath": "shortness of breath",
   "breathlessness": "shortness of breath",
-  "difficulty breathing": "shortness of breath",
+  "difficulty in breathing": "shortness of breath",
   "breathing difficulty": "shortness of breath",
   "hard to breathe": "shortness of breath",
   "can't breathe": "shortness of breath",
@@ -472,6 +474,8 @@ export const medicalMap: Record<string, string> = {
   // === HAIR LOSS ===
   "hair loss": "hair loss",
   "hair fall": "hair loss",
+  "hairfall": "hair loss",
+  "hairloss": "hair loss",
   "balding": "hair loss",
   "hair thinning": "hair loss",
   "baal gir rahe hain": "hair loss",
@@ -485,10 +489,13 @@ export const medicalMap: Record<string, string> = {
   "acne": "acne",
   "pimples": "acne",
   "skin problems": "acne",
+  "skin disease": "acne",
 
   // === MENSTRUAL PAIN ===
   "menstrual pain": "menstrual pain",
   "period pain": "menstrual pain",
+  "periods": "menstrual pain",
+  "period": "menstrual pain",
   "painful periods": "menstrual pain",
   "cramps": "menstrual pain",
   "dysmenorrhea": "menstrual pain",
@@ -625,6 +632,7 @@ export const medicalMap: Record<string, string> = {
 
   // === MEMORY PROBLEMS ===
   "memory problems": "memory problems",
+  "forgeting things": "memory problems",
   "forgetfulness": "memory problems",
   "can't remember": "memory problems",
   "memory loss": "memory problems",

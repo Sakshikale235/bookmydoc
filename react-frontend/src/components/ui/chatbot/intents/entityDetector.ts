@@ -57,6 +57,7 @@ const SYMPTOM_KEYWORDS = [
   "sore throat",
   "breathlessness",
   "shortness of breath",
+  "acne",
 ];
 
 // ----------------------------------------

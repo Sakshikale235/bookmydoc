@@ -133,7 +133,8 @@ export function detectIntent(
     "chakkar", // dizziness
     "jukaam", // cold
     "kharash", // rash
-    "rash" // added to catch skin rash
+    "rash", // added to catch skin rash
+    "acne"
   ];
 
   if (symptomKeywords.some(word => normalized.cleanedText.includes(word))) {
