@@ -739,25 +739,25 @@
 //     });
 //   };
 
-// const handleNearbyDoctors = () => {
-//   let specialization =
-//     lastAnalysisResult?.recommended_specialization ||
-//     lastAnalysisResult?.specialization ||
-//     "General Physician";
+const handleNearbyDoctors = () => {
+  let specialization =
+    lastAnalysisResult?.recommended_specialization ||
+    lastAnalysisResult?.specialization ||
+    "General Physician";
 
-//   // Keep only the first specialization segment before any comma, "and", or parentheses
-//   if (specialization.includes("(")) {
-//     specialization = specialization.split("(")[0].trim();
-//   }
-//   if (specialization.includes(" and ")) {
-//     specialization = specialization.split(" and ")[0].trim();
-//   }
-//   if (specialization.includes(",")) {
-//     specialization = specialization.split(",")[0].trim();
-//   }
+  // Keep only the first specialization segment before any comma, "and", or parentheses
+  if (specialization.includes("(")) {
+    specialization = specialization.split("(")[0].trim();
+  }
+  if (specialization.includes(" and ")) {
+    specialization = specialization.split(" and ")[0].trim();
+  }
+  if (specialization.includes(",")) {
+    specialization = specialization.split(",")[0].trim();
+  }
 
-//   navigate(`/doctor_consultation?specialization=${encodeURIComponent(specialization)}`);
-// };
+  navigate(`/doctor_consultation?specialization=${encodeURIComponent(specialization)}`);
+};
 
 //   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
 //     if (e.key === "Enter") {

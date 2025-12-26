@@ -73,8 +73,7 @@ def analyze_symptoms(request):
         if gender:
             valid_genders = {'male', 'female', 'trans'}
             if gender.lower() not in valid_genders:
-                return None
-                # return JsonResponse({"error": f"Invalid gender value: {gender}. Valid values are: male, female, trans."}, status=400)
+                return JsonResponse({"error": f"Invalid gender value: {gender}. Valid values are: male, female, trans."}, status=400)
 
         # -----------------------------
         # Validate age
@@ -131,14 +130,49 @@ def analyze_symptoms(request):
         date_str = today.strftime("%Y-%m-%d")
         month = today.month
 
+#         prompt = f"""
+# Hello! I am your AI health assistant.
+# Height: {height}, Weight: {weight}, Age: {age}, Gender: {gender}, BMI: {bmi if bmi else 'null'}, Location: {location}, Date: {date_str} (month: {month})
+# Symptoms: {symptoms}
+# Respond ONLY with valid JSON like:
+# {{"possible_diseases": ["Disease1"], "severity": "mild/moderate/severe", "doctor_recommendation": "Specialization", "advice": "Advice text"}}
+# """
+
         prompt = f"""
-Hello! I am your AI health assistant.
-Height: {height}, Weight: {weight}, Age: {age}, Gender: {gender}, BMI: {bmi if bmi else 'null'}, Location: {location}, Date: {date_str} (month: {month})
+You are a clinical triage assistant used in a digital healthcare platform for patients in India.
+Your task is to assess urgency and recommend the correct first medical specialist.
+Your role is to provide a **preliminary medical assessment only**.
+Do NOT provide treatment, lifestyle, or wellness advice.
+
+[PATIENT DATA]
+Age: {age}, Gender: {gender}, Location: {location}
+Height: {height}, Weight: {weight}, BMI: {bmi if bmi else "unknown"}
+Date: {date_str} (Month: {month})
 Symptoms: {symptoms}
-Respond ONLY with valid JSON like:
-{{"possible_diseases": ["Disease1"], "severity": "mild/moderate/severe", "doctor_recommendation": "Specialization", "advice": "Advice text"}}
+
+[LOGIC RULES]
+- onsider age-specific risk groups (pediatric, adult, geriatric).
+- Adjust risk based on BMI category if provided (underweight, normal, overweight, obese).
+- Consider seasonal or regional illnesses based on location and month
+- Use only common, clinically recognized conditions
+- If symptoms are unclear, choose statistically likely likely conditions in India.
+
+[ALLOWED SPECIALISTS — CHOOSE ONE ONLY]
+["general physician","cardiologist","neurologist","pulmonologist","ent specialist",
+ "gastroenterologist","dermatologist","orthopedic","endocrinologist",
+ "psychiatrist","gynecologist","urologist"]
+
+[OUTPUT — JSON ONLY]
+{
+  "possible_diseases": ["Disease1","Disease2"],
+  "severity": "mild | moderate | severe | emergency",
+  "doctor_recommendation": "one allowed specialist",
+  "advice": "Short, friendly, clinical next step"
+}
 """
 
+
+# "clinical_logic": "Short medical reasoning",
         # -----------------------------
         # Call Gemini API (try dynamic list of supported models)
         # -----------------------------
@@ -278,6 +312,21 @@ Respond ONLY with valid JSON like:
         reply_json["recommended_doctors"] = doctors_list
         reply_json["recommended_specialization"] = recommended_specialty
 
+        # Prepare raw API request data
+        # api_request_data = {
+        #     "height": height,
+        #     "weight": weight,
+        #     "age": age,
+        #     "gender": gender,
+        #     "symptoms": symptoms,
+        #     "location": location,
+        #     "latitude": user_lat,
+        #     "longitude": user_lng
+        # }
+
+        # Prepare raw API response data
+        # api_response_data = reply_json  # The parsed JSON response from the API
+
         # Insert symptom session record
         try:
             # Fetch patient_id by auth_id (request.user_id)
@@ -315,6 +364,46 @@ Respond ONLY with valid JSON like:
         return JsonResponse(reply_json, safe=False)
     
     
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+# -----------------------------
+# Recommend doctor endpoint
+# -----------------------------
+@csrf_exempt
+def recommend_doctor(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST requests allowed"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        disease = data.get("disease", "").strip().lower()
+
+        # Disease to specialist mapping
+        DISEASE_SPECIALIST_MAP = {
+            "asthma": "Pulmonologist",
+            "heart disease": "Cardiologist",
+            "respiratory infection": "Pulmonologist",
+            "skin infection": "Dermatologist",
+            "allergy": "Dermatologist",
+            "dengue": "General Physician",
+            "viral infection": "General Physician",
+            "anemia": "General Physician",
+            "arthritis": "Orthopedic",
+            "sinusitis": "ENT Specialist",
+            "diabetes": "Endocrinologist",
+            "hypertension": "Cardiologist",
+            "migraine": "Neurologist",
+            "depression": "Psychiatrist",
+            "anxiety": "Psychiatrist"
+        }
+
+        specialist = DISEASE_SPECIALIST_MAP.get(disease, "General Physician")
+
+        return JsonResponse({
+            "recommended_specialist": specialist
+        })
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

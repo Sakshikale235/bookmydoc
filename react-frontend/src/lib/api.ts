@@ -46,7 +46,7 @@ export const analyzeSymptoms = async (data: {
             data: error.response?.data,
             config: error.config?.url,
         });
-        
+
         // Return mock data if backend is not available (for development)
         if (error.response?.status === 404 || error.code === 'ECONNREFUSED') {
             console.warn('⚠️ Backend not available, returning mock data');
@@ -59,7 +59,36 @@ export const analyzeSymptoms = async (data: {
                 message: 'Analysis complete (mock data)'
             };
         }
-        
+
+        throw error;
+    }
+};
+
+// Recommend doctor API
+export const recommendDoctor = async (data: {
+    disease: string;
+}) => {
+    try {
+        console.log('🔍 API Request:', { endpoint: '/recommend-doctor/', data });
+        const response = await api.post('/recommend-doctor/', data, { timeout: 30000 });
+        console.log('✅ API Response:', response.data);
+        return response.data;
+    } catch (error: any) {
+        console.error('❌ API Error Details:', {
+            message: error.message,
+            status: error.response?.status,
+            data: error.response?.data,
+            config: error.config?.url,
+        });
+
+        // Return mock data if backend is not available (for development)
+        if (error.response?.status === 404 || error.code === 'ECONNREFUSED') {
+            console.warn('⚠️ Backend not available, returning mock data');
+            return {
+                recommended_specialist: 'General Physician'
+            };
+        }
+
         throw error;
     }
 };

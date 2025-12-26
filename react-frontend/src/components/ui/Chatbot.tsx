@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle } f
 import { useNavigate } from "react-router-dom";
 import { Bot, Send, RotateCcw } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
-import { analyzeSymptoms } from "../../lib/api";
+import { analyzeSymptoms, recommendDoctor } from "../../lib/api";
 // CORE BRAIN
 import { processChatMessage } from "./chatbot/core/processChatMessage";
 import {
@@ -35,130 +35,49 @@ const ChatbotContent: React.ForwardRefRenderFunction<{ sendDiseaseMessage: (dise
   const [inputText, setInputText] = useState("");
 
 const [hasGreeted, setHasGreeted] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [justRestarted, setJustRestarted] = useState(false);
   // SINGLE SOURCE OF TRUTH (memory)
   const [context, setContext] =
     useState<ConversationContext>(createInitialContext());
 
-  // Load chat history from localStorage on mount
-  useEffect(() => {
-    async function initializeChat() {
-      try {
-        // Get current user first
-        const { data: auth } = await supabase.auth.getUser();
-        const userId = auth?.user?.id;
-
-        if (userId) {
-          const savedMessages = localStorage.getItem(`chatbot_messages_${userId}`);
-          const savedContext = localStorage.getItem(`chatbot_context_${userId}`);
-          const savedHasGreeted = localStorage.getItem(`chatbot_has_greeted_${userId}`);
-
-          if (savedMessages) {
-            const parsedMessages = JSON.parse(savedMessages);
-            if (Array.isArray(parsedMessages)) {
-              setMessages(parsedMessages);
-
-              // Update messageId ref to continue from the highest ID
-              if (parsedMessages.length > 0) {
-                const maxId = Math.max(...parsedMessages.map((m: Message) => parseInt(m.id)));
-                messageId.current = maxId + 1;
-              }
-            }
-          }
-
-          if (savedContext) {
-            const parsedContext = JSON.parse(savedContext);
-            if (parsedContext && typeof parsedContext === 'object') {
-              setContext(parsedContext);
-            }
-          }
-
-          if (savedHasGreeted) {
-            setHasGreeted(JSON.parse(savedHasGreeted));
-          }
-        }
-
-        // Fetch patient profile details on refresh
-        if (auth?.user) {
-          const { data, error } = await supabase
-            .from("patients")
-            .select("age, gender, height, weight, address")
-            .eq("auth_id", auth.user.id)
-            .single();
-
-          if (data) {
-            setContext(prev => ({
-              ...prev,
-              patientProfile: data,
-              collected: {
-                ...prev.collected,
-                age: data.age ?? prev.collected.age,
-                gender: data.gender ?? prev.collected.gender,
-                height: data.height ?? prev.collected.height,
-                weight: data.weight ?? prev.collected.weight,
-                location: data.address ?? prev.collected.location
-              }
-            }));
-          } else {
-            console.warn("No patient data found", error);
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to initialize chat:', error);
-      }
-    }
-
-    initializeChat();
-  }, []);
-
-  // Save chat history to localStorage whenever messages, context, or hasGreeted change
-  useEffect(() => {
-    async function saveMessages() {
-      try {
-        const { data: auth } = await supabase.auth.getUser();
-        const userId = auth?.user?.id;
-        if (userId) {
-          localStorage.setItem(`chatbot_messages_${userId}`, JSON.stringify(messages));
-        }
-      } catch (error) {
-        console.warn('Failed to save messages to localStorage:', error);
-      }
-    }
-    saveMessages();
-  }, [messages]);
-
-  useEffect(() => {
-    async function saveContext() {
-      try {
-        const { data: auth } = await supabase.auth.getUser();
-        const userId = auth?.user?.id;
-        if (userId) {
-          localStorage.setItem(`chatbot_context_${userId}`, JSON.stringify(context));
-        }
-      } catch (error) {
-        console.warn('Failed to save context to localStorage:', error);
-      }
-    }
-    saveContext();
-  }, [context]);
-
-  useEffect(() => {
-    async function saveHasGreeted() {
-      try {
-        const { data: auth } = await supabase.auth.getUser();
-        const userId = auth?.user?.id;
-        if (userId) {
-          localStorage.setItem(`chatbot_has_greeted_${userId}`, JSON.stringify(hasGreeted));
-        }
-      } catch (error) {
-        console.warn('Failed to save hasGreeted to localStorage:', error);
-      }
-    }
-    saveHasGreeted();
-  }, [hasGreeted]);
-
   const messageId = useRef(1);
   const chatRef = useRef<HTMLDivElement | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+
+  // AI queue + typewriter support
+  const [aiQueue, setAiQueue] = useState<Array<{ text: string; action?: { label: string; url: string }; isAnalyzing?: boolean }>>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const typingIntervalRef = useRef<number | null>(null);
+  const isProcessingRef = useRef(false);
+  const [showTypingIndicator, setShowTypingIndicator] = useState(false);
+  const [analyzingTyping, setAnalyzingTyping] = useState(false);
+  const [analyzingDots, setAnalyzingDots] = useState(".");
+
+  /* ----------------------------------
+     Helpers
+  ----------------------------------- */
+  const pushUserMessage = (text: string) => {
+    const newMessage: Message = {
+      id: (messageId.current++).toString(),
+      text,
+      sender: "user"
+    };
+    setMessages(prev => [
+      ...prev,
+      newMessage
+    ]);
+    // Save to session async (non-blocking)
+    saveMessageToSession(newMessage);
+  };
+
+  // enqueue helpers (used across the component)
+  const queueAIMessage = (text: string, action?: { label: string; url: string }, isAnalyzing?: boolean) => {
+    setAiQueue(prev => [...prev, { text, action, isAnalyzing }]);
+  };
+
+  const pushAIMessage = (text: string, isAnalyzing?: boolean) => queueAIMessage(text, undefined, isAnalyzing);
+  const pushAIActionMessage = (text: string, label: string, url: string) => queueAIMessage(text, { label, url });
 
   // Function to create/initialize a symptom session
   const createSymptomSession = async (): Promise<string | null> => {
@@ -242,6 +161,123 @@ const [hasGreeted, setHasGreeted] = useState(false);
     }
   };
 
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    async function initializeChat() {
+      try {
+        // Get current user first
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth?.user?.id;
+        setUserId(userId); // Store userId in state
+        let savedMessages: string | null = null;
+
+        if (userId) {
+          savedMessages = localStorage.getItem(`chatbot_messages_${userId}`);
+          const savedContext = localStorage.getItem(`chatbot_context_${userId}`);
+          const savedHasGreeted = localStorage.getItem(`chatbot_has_greeted_${userId}`);
+
+          if (savedMessages) {
+            const parsedMessages = JSON.parse(savedMessages);
+            if (Array.isArray(parsedMessages)) {
+              setMessages(parsedMessages);
+
+              // Update messageId ref to continue from the highest ID
+              if (parsedMessages.length > 0) {
+                const maxId = Math.max(...parsedMessages.map((m: Message) => parseInt(m.id)));
+                messageId.current = maxId + 1;
+              }
+            }
+          }
+
+          if (savedContext) {
+            const parsedContext = JSON.parse(savedContext);
+            if (parsedContext && typeof parsedContext === 'object') {
+              setContext(parsedContext);
+            }
+          }
+
+          if (savedHasGreeted) {
+            setHasGreeted(JSON.parse(savedHasGreeted));
+          }
+        }
+
+        // Fetch patient profile details on refresh
+        if (auth?.user) {
+          const { data, error } = await supabase
+            .from("patients")
+            .select("age, gender, height, weight, address")
+            .eq("auth_id", auth.user.id)
+            .single();
+
+          if (data) {
+            setContext(prev => ({
+              ...prev,
+              patientProfile: data,
+              collected: {
+                ...prev.collected,
+                age: data.age ?? prev.collected.age,
+                gender: data.gender ?? prev.collected.gender,
+                height: data.height ?? prev.collected.height,
+                weight: data.weight ?? prev.collected.weight,
+                location: data.address ?? prev.collected.location
+              }
+            }));
+          } else {
+            console.warn("No patient data found", error);
+          }
+        }
+
+        // Show initial greeting if no saved messages
+        if (!savedMessages) {
+          setTimeout(() => {
+            pushAIMessage("Hello 👋 I'm your health assistant.");
+            pushAIMessage(
+              "I can help you with symptom analysis, appointment booking, and general health-related questions."
+            );
+            setHasGreeted(true);
+          }, 100);
+        }
+      } catch (error) {
+        console.warn('Failed to initialize chat:', error);
+      }
+    }
+
+    initializeChat();
+  }, []);
+
+  // Save chat history to localStorage whenever messages, context, or hasGreeted change
+  useEffect(() => {
+    if (userId) {
+      try {
+        localStorage.setItem(`chatbot_messages_${userId}`, JSON.stringify(messages));
+      } catch (error) {
+        console.warn('Failed to save messages to localStorage:', error);
+      }
+    }
+  }, [messages, userId]);
+
+  useEffect(() => {
+    if (userId) {
+      try {
+        localStorage.setItem(`chatbot_context_${userId}`, JSON.stringify(context));
+      } catch (error) {
+        console.warn('Failed to save context to localStorage:', error);
+      }
+    }
+  }, [context, userId]);
+
+  useEffect(() => {
+    if (userId) {
+      try {
+        localStorage.setItem(`chatbot_has_greeted_${userId}`, JSON.stringify(hasGreeted));
+      } catch (error) {
+        console.warn('Failed to save hasGreeted to localStorage:', error);
+      }
+    }
+  }, [hasGreeted, userId]);
+
+
+
   // Expose method to send disease message
   useImperativeHandle(ref, () => ({
     sendDiseaseMessage: (disease: string) => {
@@ -268,9 +304,20 @@ useEffect(() => {
   }
 }, [messages]);
 
-    /* ----------------------------------
-     Initial Greeting (once)
-  ----------------------------------- */
+/* ----------------------------------
+   Initial Greeting (once)
+----------------------------------- */
+useEffect(() => {
+  if (!hasGreeted && messages.length === 0 && !justRestarted) {
+    setTimeout(() => {
+      pushAIMessage("Hello 👋 I'm your health assistant.");
+      pushAIMessage(
+        "I can help you with symptom analysis, appointment booking, and general health-related questions."
+      );
+      setHasGreeted(true);
+    }, 100);
+  }
+}, [hasGreeted, messages.length, justRestarted]);
   
 
   
@@ -357,39 +404,7 @@ useEffect(() => {
   fetchPatientProfile();
 }, []);
 
-  /* ----------------------------------
-     Helpers
-  ----------------------------------- */
-  const pushUserMessage = (text: string) => {
-    const newMessage: Message = {
-      id: (messageId.current++).toString(),
-      text,
-      sender: "user"
-    };
-    setMessages(prev => [
-      ...prev,
-      newMessage
-    ]);
-    // Save to session async (non-blocking)
-    saveMessageToSession(newMessage);
-  };
 
-  // AI queue + typewriter support
-  const [aiQueue, setAiQueue] = useState<Array<{ text: string; action?: { label: string; url: string }; isAnalyzing?: boolean }>>([]);
-  const [isTyping, setIsTyping] = useState(false);
-  const typingIntervalRef = useRef<number | null>(null);
-  const isProcessingRef = useRef(false);
-  const [showTypingIndicator, setShowTypingIndicator] = useState(false);
-  const [analyzingTyping, setAnalyzingTyping] = useState(false);
-  const [analyzingDots, setAnalyzingDots] = useState(".");
-
-  const queueAIMessage = (text: string, action?: { label: string; url: string }, isAnalyzing?: boolean) => {
-    setAiQueue(prev => [...prev, { text, action, isAnalyzing }]);
-  };
-
-  // enqueue helpers (used across the component)
-  const pushAIMessage = (text: string, isAnalyzing?: boolean) => queueAIMessage(text, undefined, isAnalyzing);
-  const pushAIActionMessage = (text: string, label: string, url: string) => queueAIMessage(text, { label, url });
 
   // Worker: process aiQueue sequentially
   useEffect(() => {
@@ -543,7 +558,19 @@ useEffect(() => {
       if (vLower === "yes" || vLower === "y") {
         pushUserMessage(text);
         pushAIMessage("Great! Here is a link to find nearby doctors.");
-        const url = `/nearby_doctors`;
+        const lastAnalysisResult = (context as any).analysisResult;
+        let specialization =
+          lastAnalysisResult?.recommended_specialization ||
+          lastAnalysisResult?.specialization ||
+          "General Physician";
+
+        // Redirect emergency physician or general practitioner to general physician
+        if (specialization.toLowerCase() === "emergency physician" || specialization.toLowerCase() === "general practitioner") {
+          specialization = "General Physician";
+        }
+
+        const cleanedSpecialization = cleanSpecialization(specialization);
+        const url = `/doctor_consultation?specialization=${encodeURIComponent(cleanedSpecialization)}`;
         pushAIActionMessage("Open nearby doctors", "Nearby Doctors", url);
         setContext(prev => ({ ...(prev as any), awaitingNearbyDoctorConsent: false }));
         setInputText("");
@@ -569,7 +596,13 @@ useEffect(() => {
     const result: any = processChatMessage(text, context);
 
     // 3. Show bot reply
-    if (result.reply) pushAIMessage(result.reply);
+    if (result.reply) {
+      if (result.action) {
+        pushAIActionMessage(result.reply, result.action.label, result.action.url);
+      } else {
+        pushAIMessage(result.reply);
+      }
+    }
 
     // 4. Save updated context
     setContext(result.context);
@@ -589,6 +622,26 @@ useEffect(() => {
 
   const handleBackendAnalysis = async (result: any) => {
     const endpoint = result.backendRequest.endpoint;
+
+    if (endpoint === "/recommend-doctor/") {
+      // Handle doctor recommendation for reported disease
+      try {
+        const response = await recommendDoctor(result.backendRequest.data);
+        let specialist = response.recommended_specialist || "General Physician";
+
+        // Redirect emergency physician or general practitioner to general physician
+        if (specialist.toLowerCase() === "emergency physician" || specialist.toLowerCase() === "general practitioneer") {
+          specialist = "General Physician";
+        }
+
+        pushAIMessage(`You should consult a ${specialist}.`);
+        pushAIActionMessage("Find nearby doctors", "Nearby Doctors", `/doctor_consultation?specialization=${encodeURIComponent(specialist)}`);
+      } catch (err) {
+        console.error("Error recommending doctor:", err);
+        pushAIMessage("Sorry, I couldn't find a specialist recommendation for that condition.");
+      }
+      return;
+    }
 
     if (endpoint === "/create-symptom-session/") {
       // Handle session creation
@@ -718,7 +771,31 @@ useEffect(() => {
     }
   };
 
-  const handleRestart = () => {
+  const handleRestart = async () => {
+    // Set justRestarted to prevent automatic greeting
+    setJustRestarted(true);
+
+    // First, fetch the patient profile
+    let patientData = null;
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (auth?.user) {
+        const { data, error } = await supabase
+          .from("patients")
+          .select("age, gender, height, weight, address")
+          .eq("auth_id", auth.user.id)
+          .single();
+
+        if (data) {
+          patientData = data;
+        } else {
+          console.warn("No patient data found", error);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching patient profile:", error);
+    }
+
     // Clear all states
     setInputText("");
     setMessages([]); // Clear messages immediately
@@ -731,22 +808,33 @@ useEffect(() => {
     setShowTypingIndicator(false);
 
     // Clear user-specific localStorage
-    (async () => {
-      try {
-        const { data: auth } = await supabase.auth.getUser();
-        const userId = auth?.user?.id;
-        if (userId) {
-          localStorage.removeItem(`chatbot_messages_${userId}`);
-          localStorage.removeItem(`chatbot_context_${userId}`);
-          localStorage.removeItem(`chatbot_has_greeted_${userId}`);
-        }
-      } catch (error) {
-        console.warn('Failed to clear user-specific localStorage:', error);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth?.user?.id;
+      if (userId) {
+        localStorage.removeItem(`chatbot_messages_${userId}`);
+        localStorage.removeItem(`chatbot_context_${userId}`);
+        localStorage.removeItem(`chatbot_has_greeted_${userId}`);
       }
-    })();
+    } catch (error) {
+      console.warn('Failed to clear user-specific localStorage:', error);
+    }
 
-    // Refetch patient profile after restart (non-blocking)
-    fetchPatientProfile();
+    // Set the patient profile in the context
+    if (patientData) {
+      setContext(prev => ({
+        ...prev,
+        patientProfile: patientData,
+        collected: {
+          ...prev.collected,
+          age: patientData.age ?? prev.collected.age,
+          gender: patientData.gender ?? prev.collected.gender,
+          height: patientData.height ?? prev.collected.height,
+          weight: patientData.weight ?? prev.collected.weight,
+          location: patientData.address ?? prev.collected.location
+        }
+      }));
+    }
 
     // Show greeting directly after restart
     setTimeout(() => {
@@ -755,6 +843,8 @@ useEffect(() => {
         "I can help you with symptom analysis, appointment booking, and general health-related questions."
       );
       setHasGreeted(true);
+      // Reset justRestarted after greeting is shown
+      setJustRestarted(false);
     }, 100);
   };
   const formatMessageToHtml = (text: string) => {

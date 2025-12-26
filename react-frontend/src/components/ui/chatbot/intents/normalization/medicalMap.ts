@@ -124,6 +124,7 @@ export const medicalMap: Record<string, string> = {
   "itching": "rash",
   "itch": "rash",
   "skin rash": "rash",
+  "skin dryness": "rash",
   "skin irritation": "rash",
   "allergic rash": "rash",
   "red spots": "rash",
@@ -478,7 +479,7 @@ export const medicalMap: Record<string, string> = {
 
   // === DRY SKIN ===
   "dry skin": "dry skin",
-  "skin dryness": "dry skin",
+  // "skin dryness": "dry skin",
   "oily skin": "oily skin",
   "skin oiliness": "oily skin",
   "acne": "acne",

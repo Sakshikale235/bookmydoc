@@ -33,6 +33,7 @@ export function processChatMessage(
     context: ConversationContext;
     backendRequest?: { endpoint: string; data: any };
     navigate?: string;
+    action?: { label: string; url: string };
 } {
     // -----------------------------
     // 1. NORMALIZATION
@@ -60,18 +61,86 @@ export function processChatMessage(
     // =====================================================
 
     // -----------------------------
+    // UPDATE PROFILE INTENT (HIGHEST PRIORITY)
+    // -----------------------------
+    if (intent.type === "update_profile") {
+        const target = intent.targets?.[0];
+        console.log("🔄 UPDATE PROFILE DETECTED:", target);
+
+        if (target === "age") {
+            return {
+                reply: "Please enter your new age.",
+                context: {
+                    ...prevContext,
+                    state: ConversationState.ASK_NEW_FIELD_VALUE,
+                    fieldToUpdate: "age"
+                }
+            };
+        } else if (target === "gender") {
+            return {
+                reply: "Please enter your new gender (male / female / trans).",
+                context: {
+                    ...prevContext,
+                    state: ConversationState.ASK_NEW_FIELD_VALUE,
+                    fieldToUpdate: "gender"
+                }
+            };
+        } else if (target === "height") {
+            return {
+                reply: "Please enter your new height in cm.",
+                context: {
+                    ...prevContext,
+                    state: ConversationState.ASK_NEW_FIELD_VALUE,
+                    fieldToUpdate: "height"
+                }
+            };
+        } else if (target === "weight") {
+            return {
+                reply: "Please enter your new weight in kg.",
+                context: {
+                    ...prevContext,
+                    state: ConversationState.ASK_NEW_FIELD_VALUE,
+                    fieldToUpdate: "weight"
+                }
+            };
+        } else if (target === "location") {
+            return {
+                reply: "Please enter your new location.",
+                context: {
+                    ...prevContext,
+                    state: ConversationState.ASK_NEW_FIELD_VALUE,
+                    fieldToUpdate: "location"
+                }
+            };
+        } else {
+            return {
+                reply: "Which detail would you like to update? Age, Gender, Height, Weight, or Location?",
+                context: {
+                    ...prevContext,
+                    state: ConversationState.ASK_WHICH_PROFILE_FIELD
+                }
+            };
+        }
+    }
+
+    // -----------------------------
     // DISEASE INTENT (HIGHEST PRIORITY)
     // -----------------------------
     if (intent.type === "report_disease") {
         const disease = intent.targets?.[0] || normalized.normalizedText;
         console.log("🩺 DISEASE DETECTED:", disease);
 
+        // Use recommend-doctor endpoint for specialist recommendation
+        const payload = {
+            disease: disease
+        };
+
         return {
             reply: `I understand you have ${disease}. Let me recommend a specialist for you.`,
             context: prevContext,
             backendRequest: {
                 endpoint: "/recommend-doctor/",
-                data: { disease: disease }
+                data: payload
             }
         };
     }
@@ -165,7 +234,26 @@ export function processChatMessage(
         return {
             reply: `Based on your symptoms, I recommend consulting a ${specialization}. Let me help you find one.`,
             context: prevContext,
-            navigate: `/doctor-consultation?specialization=${encodeURIComponent(specialization)}`
+            navigate: `/doctor_consultation?specialization=${encodeURIComponent(specialization)}`
+        };
+    }
+
+    // -----------------------------
+    // BOOK APPOINTMENT INTENT
+    // -----------------------------
+    if (intent.type === "book_appointment") {
+        console.log("📅 BOOK APPOINTMENT INTENT DETECTED");
+
+        // Extract specialization from normalized text (e.g., "show cardiologist" -> "cardiologist")
+        const specialization = normalized.normalizedText.replace(/^show\s+/i, "").trim();
+
+        return {
+            reply: `Let me help you find a ${specialization}.`,
+            context: prevContext,
+            action: {
+                label: "Find Nearby Doctors",
+                url: `/doctor_consultation?specialization=${encodeURIComponent(specialization)}`
+            }
         };
     }
 
@@ -223,7 +311,7 @@ export function processChatMessage(
 
     // Handle UPDATE_PROFILE_FIELD: user selects which field to update
     if (prevContext.state === ConversationState.UPDATE_PROFILE_FIELD) {
-        const input = normalized.rawText.toLowerCase().trim();
+        const input = normalized.normalizedText.toLowerCase().trim();
 
         // More flexible field matching - check if input contains field name
         if (input.includes("age")) {
@@ -262,7 +350,7 @@ export function processChatMessage(
                     fieldToUpdate: "weight"
                 }
             };
-        } else if (input.includes("location") || input.includes("city") || input.includes("place")) {
+        } else if (input.includes("location") || input.includes("city") || input.includes("place") || input.includes("address")) {
             return {
                 reply: "Please enter your new location.",
                 context: {
@@ -378,6 +466,7 @@ export function processChatMessage(
                 `• Location: ${p?.location ?? "Not provided"}\n\n` +
                 "Are these correct? (yes / no)";
 
+            break;
         }
 
         case ConversationState.ASK_AGE: {
@@ -454,6 +543,11 @@ export function processChatMessage(
                     data: payload
                 }
             };
+        }
+
+        case ConversationState.ASK_WHICH_PROFILE_FIELD: {
+            reply = "Which detail would you like to update? Age, Gender, Height, Weight, or Location?";
+            break;
         }
     }
 

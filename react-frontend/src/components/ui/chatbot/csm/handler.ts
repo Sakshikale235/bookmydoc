@@ -38,6 +38,10 @@ export function handleConversation(
         return { ...context, state: ConversationState.EMERGENCY_FLOW };
       }
 
+      if (intent.type === "stop") {
+        return { ...context, state: ConversationState.END };
+      }
+
       if (
         intent.type === "report_symptom" ||
         intent.type === "book_appointment"
@@ -46,24 +50,24 @@ export function handleConversation(
       }
 
       if (intent.type === "update_profile") {
-        return { ...context, state: ConversationState.VERIFY_PROFILE };
+        return { ...context, state: ConversationState.CONFIRM_PROFILE };
       }
 
       return { ...context, state: ConversationState.IDLE };
 
     // -----------------------------
-    // ASK SYMPTOMS → VERIFY PROFILE
+    // ASK SYMPTOMS → CONFIRM PROFILE
     // -----------------------------
     case ConversationState.ASK_SYMPTOMS:
       return {
         ...context,
-        state: ConversationState.VERIFY_PROFILE
+        state: ConversationState.CONFIRM_PROFILE
       };
 
     // -----------------------------
-    // VERIFY PROFILE
+    // CONFIRM PROFILE
     // -----------------------------
-    case ConversationState.VERIFY_PROFILE: {
+    case ConversationState.CONFIRM_PROFILE: {
       // User explicitly wants to update profile
       if (intent.type === "update_profile") {
         return {
@@ -108,7 +112,7 @@ export function handleConversation(
         return {
           ...context,
           collected: { ...context.collected, age },
-          state: ConversationState.VERIFY_PROFILE
+          state: ConversationState.CONFIRM_PROFILE
         };
       }
       return context;
@@ -120,7 +124,7 @@ export function handleConversation(
         return {
           ...context,
           collected: { ...context.collected, gender },
-          state: ConversationState.VERIFY_PROFILE
+          state: ConversationState.CONFIRM_PROFILE
         };
       }
       return context;
@@ -132,7 +136,7 @@ export function handleConversation(
         return {
           ...context,
           collected: { ...context.collected, height },
-          state: ConversationState.VERIFY_PROFILE
+          state: ConversationState.CONFIRM_PROFILE
         };
       }
       return context;
@@ -144,7 +148,7 @@ export function handleConversation(
         return {
           ...context,
           collected: { ...context.collected, weight },
-          state: ConversationState.VERIFY_PROFILE
+          state: ConversationState.CONFIRM_PROFILE
         };
       }
       return context;
@@ -156,7 +160,7 @@ export function handleConversation(
         return {
           ...context,
           collected: { ...context.collected, location },
-          state: ConversationState.VERIFY_PROFILE
+          state: ConversationState.CONFIRM_PROFILE
         };
       }
       return context;

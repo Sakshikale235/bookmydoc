@@ -145,7 +145,7 @@ const BookAppointment = () => {
       alert('Error loading data. Please try again.');
     } finally {
       setLoading(false);
-    }
+    } 
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

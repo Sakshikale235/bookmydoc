@@ -18,6 +18,7 @@ export type IntentType =
   | "yes"
   | "no"
   | "thanks"
+  | "stop"
   | "other";
 
 export type DetectedIntent = {
@@ -45,6 +46,8 @@ const YES_WORDS = ["yes", "ok", "okay", "sure"];
 const NO_WORDS = ["no", "not", "never"];
 
 const THANKS_WORDS = ["thanks", "thank you", "thankyou", "thx"];
+
+const STOP_WORDS = ["stop", "cancel", "quit", "exit", "end", "abort"];
 
 const PROFILE_FIELDS = [
   "age",
@@ -108,7 +111,7 @@ export function detectIntent(
   const words = text.split(/\s+/);
 
   // -----------------------------
-  // STRONG SYMPTOM INTENT CHECK (using normalized text)
+  // STRONG SYMPTOM INTENT CHECK (using cleaned text to avoid normalization issues)
   // -----------------------------
   const symptomKeywords = [
     "fever",
@@ -129,10 +132,11 @@ export function detectIntent(
     "pet dard", // stomach pain
     "chakkar", // dizziness
     "jukaam", // cold
-    "kharash" // rash
+    "kharash", // rash
+    "rash" // added to catch skin rash
   ];
 
-  if (symptomKeywords.some(word => text.includes(word))) {
+  if (symptomKeywords.some(word => normalized.cleanedText.includes(word))) {
     return {
       type: "report_symptom",
       confidence: 0.9
@@ -642,6 +646,13 @@ export function detectIntent(
   // -----------------------------
   if (words.length <= 3 && THANKS_WORDS.some(t => text.includes(t))) {
     return { type: "thanks", confidence: 0.9 };
+  }
+
+  // -----------------------------
+  // 3.7 Stop
+  // -----------------------------
+  if (words.length <= 2 && STOP_WORDS.some(s => text.includes(s))) {
+    return { type: "stop", confidence: 0.95 };
   }
 
   // -----------------------------

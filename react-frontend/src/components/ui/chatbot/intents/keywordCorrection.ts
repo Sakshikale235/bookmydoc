@@ -100,6 +100,109 @@ function getCandidates(token: string): string[] {
 }
 
 /**
+ * TYPO_MAP: Direct typo corrections for profile fields and common misspellings.
+ */
+const TYPO_MAP: Record<string, string> = {
+  // GENDER typos (including normalization)
+  "m": "male",
+  "ma": "male",
+  "mal": "male",
+  "maale": "male",
+  "mael": "male",
+  "mle": "male",
+  "ladka": "male",
+  "boy": "male",
+
+  "f": "female",
+  "fe": "female",
+  "fem": "female",
+  "femal": "female",
+  "femail": "female",
+  "femle": "female",
+  "ladki": "female",
+  "girl": "female",
+
+  "trans": "trans",
+  "transgender": "trans",
+
+  // AGE typos
+  "agee": "age",
+  "aeg": "age",
+  "ag": "age",
+  "dge": "age",
+  "agw": "age",
+  "aj": "age",
+  "ae": "age",
+
+  // GENDER typos (additional)
+  "gnder": "gender",
+  "gende": "gender",
+  "gnr": "gender",
+  "gendre": "gender",
+  "gen": "gender",
+  "gdar": "gender",
+  "gnd": "gender",
+  "gndr": "gender",
+  "ganr": "gender",
+  "genderr": "gender",
+
+  // HEIGHT typos
+  "hieght": "height",
+  "heigt": "height",
+  "hght": "height",
+  "hgt": "height",
+  "ht": "height",
+  "heit": "height",
+  "heght": "height",
+  "heiht": "height",
+  "hiegh": "height",
+  "heigth": "height",
+
+  // WEIGHT typos
+  "wight": "weight",
+  "wieght": "weight",
+  "wegit": "weight",
+  "wgt": "weight",
+  "whigt": "weight",
+  "weit": "weight",
+  "weig": "weight",
+  "w8": "weight",
+  "wt": "weight",
+
+  // BLOOD GROUP typos
+  "bloodgroup": "blood_group",
+  "bld grp": "blood_group",
+  "blod grp": "blood_group",
+  "bldgroup": "blood_group",
+  "bldgrp": "blood_group",
+  "bloodgrp": "blood_group",
+  "blood groop": "blood_group",
+  "bloodgruop": "blood_group",
+  "bg": "blood_group",
+
+  // ADDRESS typos
+  "adress": "address",
+  "addres": "address",
+  "adres": "address",
+  "adr": "address",
+  "addrs": "address",
+  "addresz": "address",
+  "adala": "address",
+  "add": "address",
+
+  // LOCATION typos
+  "loc": "location",
+  "loaction": "location",
+  "loction": "location",
+  "loacation": "location",
+  "lacation": "location",
+  "lctn": "location",
+  "lcoation": "location",
+  "loac": "location",
+  "locn": "location",
+};
+
+/**
  * correctWord: attempt to replace a single token with dictionary match if within maxDistance.
  * Returns original token if no confident correction found.
  */
@@ -108,6 +211,11 @@ export function correctWord(token: string, maxDistance = 2): string {
   // Preserve numbers, emails, slugs etc.
   if (/^\d+$/.test(token) || /\d+[\w-]*@/.test(token)) return token;
   const lower = token.toLowerCase();
+
+  // Check direct typo map first
+  const directCorrection = TYPO_MAP[lower];
+  if (directCorrection) return directCorrection;
+
   // quick exact check
   if ((DICT as string[]).includes(lower)) return lower;
 

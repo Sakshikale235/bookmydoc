@@ -12,6 +12,8 @@ import {
 export type ExtractedEntities = {
   age?: number | null;
   gender?: string | null;
+  height?: number | null;
+  weight?: number | null;
   symptoms?: string[];
   duration?: string | null;
   intensity?: string | null;
@@ -49,6 +51,7 @@ const SYMPTOM_KEYWORDS = [
   "chills",
   "itching",
   "rash",
+  "dry skin",
   "fatigue",
   "dizziness",
   "sore throat",
@@ -101,6 +104,28 @@ export function extractEntities(rawMessage: string): ExtractedEntities {
       if (validateIntensity(i)) intensity = i;
       break;
     }
+  }
+
+  // ----------------------------------------
+  // HEIGHT ("170 cm", "5'10 inches", "170 centimeters")
+  // ----------------------------------------
+  let height: number | null = null;
+  const heightRegex = /\b(\d{1,3})\s*(?:cm|centimeters?|inches?|in|'|ft|feet)\b/i;
+  const heightMatch = text.match(heightRegex);
+  if (heightMatch) {
+    height = parseInt(heightMatch[1]);
+    if (height < 30 || height > 300) height = null;
+  }
+
+  // ----------------------------------------
+  // WEIGHT ("60 kg", "150 pounds", "60 kilograms")
+  // ----------------------------------------
+  let weight: number | null = null;
+  const weightRegex = /\b(\d{1,3})\s*(?:kg|kilograms?|pounds?|lbs?|kgs?)\b/i;
+  const weightMatch = text.match(weightRegex);
+  if (weightMatch) {
+    weight = parseInt(weightMatch[1]);
+    if (weight < 2 || weight > 600) weight = null;
   }
 
   // ----------------------------------------
